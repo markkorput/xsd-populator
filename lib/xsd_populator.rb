@@ -63,7 +63,7 @@ class XsdPopulator
       return nil
     end
 
-    xml = Builder::XmlMarkup.new(:ident => 2)
+    xml = Builder::XmlMarkup.new(:indent => 2)
     xml.instruct!
 
     build_element(xml, target_el)
