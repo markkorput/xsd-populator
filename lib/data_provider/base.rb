@@ -60,6 +60,14 @@ module DataProvider
         data[param_name]
       end
 
+      def give(_data = {})
+        return self.class.new(data.merge(_data))
+      end
+
+      def give!(_data = {})
+        @data = data.merge(_data)
+        return self
+      end
     end # module InstanceMethods
 
   end # module Base
