@@ -10,3 +10,4 @@ $: << File.expand_path(CURRENT_DIR + "/../lib")
 
 require 'xsd_populator'
 require 'byebug'
+require 'nokogiri'
