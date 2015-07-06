@@ -37,6 +37,16 @@ module DataProvider
         end
       end
 
+      def add_xml_provider(providers_module, opts = {})
+        data = providers_module.instance_variable_get('@data_provider') || {}
+
+        (data[:provider_args] || []).each do |definition|
+          definition[0] = [definition[0]].flatten
+          definition[0] = [opts[:scope]].flatten.compact + definition[0] if opts[:scope]
+          add_provider(*definition)
+        end
+      end
+
       private
 
       def add_provider(identifier, opts = {}, block = nil)
