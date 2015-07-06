@@ -9,10 +9,12 @@ describe DataProvider::Base do
 
     provider :sum, :requires => [:array] do
       sum = 0
+
       given(:array).each do |number|
         sum += number.to_i
       end
-      return sum
+
+      sum
     end
 
   end
@@ -28,4 +30,9 @@ describe DataProvider::Base do
     end
   end
 
+  describe "#take" do
+    it 'lets you take data from it' do
+      expect(@provider.take(:sum)).to eq 7
+    end
+  end
 end
