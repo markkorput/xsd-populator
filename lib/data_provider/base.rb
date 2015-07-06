@@ -11,6 +11,7 @@ module DataProvider
     end
 
     module ClassMethods
+
       def provider identifier, opts = {}, &block
         add_provider(identifier, opts, block_given? ? block : nil)
       end
@@ -28,12 +29,20 @@ module DataProvider
         return args.nil? ? nil : SingleProvider.new(*args)
       end
 
+      def add(providers_module)
+        data = providers_module.instance_variable_get('@data_provider') || {}
+
+        (data[:provider_args] || []).each do |definition|
+          add_provider(*definition)
+        end
+      end
+
       private
 
       def add_provider(identifier, opts = {}, block = nil)
         @data_provider ||= {}
         @data_provider[:provider_args] ||= []
-        @data_provider[:provider_args] << [identifier, opts, block]
+        @data_provider[:provider_args].unshift [identifier, opts, block]
       end
     end # module ClassMethods
 
