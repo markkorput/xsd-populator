@@ -23,7 +23,7 @@ describe DataProvider::Base do
   end
 
   before :all do
-    @provider = ProviderClass.new(:array => [1,2,4])
+    @provider = ProviderClass.new(:data => {:array => [1,2,4]})
   end
 
   describe "#has_provider?" do
@@ -55,7 +55,7 @@ describe DataProvider::Base do
 
   describe "#give!" do
     it "lets you update the current provider with additional data" do
-      provider = ProviderClass.new(:array => [1,1,90])
+      provider = ProviderClass.new(:data => {:array => [1,1,90]})
       expect(provider.take(:sum)).to eq 92
       provider.give!(:array => [3,90])
       expect(provider.take(:sum)).to eq 93

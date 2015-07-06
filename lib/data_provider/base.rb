@@ -60,9 +60,15 @@ module DataProvider
     module InstanceMethods
 
       attr_reader :data
+      attr_reader :options
 
-      def initialize(data = {})
-        @data = (data.is_a?(Hash) ? data : {})
+      def initialize(opts = {})
+        @options = opts.is_a?(Hash) ? opts : {}
+        @data = options[:data].is_a?(Hash) ? options[:data] : {}
+      end
+
+      def logger
+        @logger ||= options[:logger] || Logger.new(STDOUT)
       end
 
       def has_provider?(id)
@@ -72,7 +78,23 @@ module DataProvider
       def take(id)
         single_provider = self.class.single_provider(id) #, :data => @data)
         # execute block with the scope of this object
-        single_provider ? instance_eval(&single_provider.block) : nil
+        if single_provider.nil?
+          logger.warn "Can't find provider: #{id.inspect}"
+          return nil
+        end
+
+        return instance_eval(&single_provider.block) 
+      end
+
+      def try_take(id)
+        single_provider = self.class.single_provider(id) #, :data => @data)
+        # execute block with the scope of this object
+        if single_provider.nil?
+          logger.debug "Try for missing provider: #{id.inspect}"
+          return nil
+        end
+
+        return instance_eval(&single_provider.block)
       end
 
       def given(param_name)
@@ -80,7 +102,7 @@ module DataProvider
       end
 
       def give(_data = {})
-        return self.class.new(data.merge(_data))
+        return self.class.new(options.merge(:data => data.merge(_data)))
       end
 
       def give!(_data = {})

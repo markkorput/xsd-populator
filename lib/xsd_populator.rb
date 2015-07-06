@@ -11,7 +11,7 @@ class XsdPopulator
   end
 
   def logger
-    @logger ||= Logger.new(STDOUT)
+    @logger ||= options[:logger] || Logger.new(STDOUT)
   end
 
   def xsd_reader
@@ -48,18 +48,18 @@ class XsdPopulator
 
       # log a warning message, informing that we disregard the other elements
       if target_el && xsd_reader.elements.length > 1
-        logger.info "Multiple root-level element definitions found in XSD schema, only processing the first one (#{target_el.name})"
+        logger.info "XsdPopulator#populate_xml - Multiple root-level element definitions found in XSD schema, only processing the first one (#{target_el.name})"
       end
     elsif target_el.nil?
-      logger.warn "Specified element (#{options[:element].inspect}) not found, aborting"
+      logger.warn "XsdPopulator#populate_xml - Specified element (#{options[:element].inspect}) not found, aborting"
       return nil
     else
-      logger.info "Starting at specified element: #{target_el.name}"
+      logger.info "XsdPopulator#populate_xml - Starting at specified element: #{target_el.name}"
     end
 
     # no element definition found? abort with warning
     if target_el.nil?
-      logger.warn 'No element definitions found in XSD schema, aborting'
+      logger.warn 'XsdPopulator#populate_xml - No element definitions found in XSD schema, aborting'
       return nil
     end
 
@@ -72,7 +72,9 @@ class XsdPopulator
   end
 
 
-  def build_element(xml, element, provider = nil, stack = [])
+  def build_element(xml, element, provider = self.provider, stack = [])
+    content_data = provider.nil? ? nil : provider.try_take(stack + [element.name])
+
     # TODO; more sophisticated recursion detection;
     # multiple elements of the same name should be able
     # to occur insid the stack
@@ -83,11 +85,11 @@ class XsdPopulator
 
     logger.debug("XsdPopulator#build_element element: #{element.name}, stack: #{stack.inspect}")
 
-    if element.multiple_allowed?
-      xml.comment!("Multiple instances of #{element.name} allowed here")
+    attributes_hash = element.attributes.inject({}) do |result, attribute|
+      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
+      attribute_data ||= attribute.type if provider.nil? # assume demo xml
+      result.merge(attribute.name => attribute_data)
     end
-
-    attributes_hash = element.attributes.inject({}){|result, attribute| result.merge(attribute.name => attribute.type)}
 
     if element.child_elements?  
       xml.tag!(element.name, attributes_hash) do
@@ -95,8 +97,45 @@ class XsdPopulator
           build_element(xml, child, provider, stack + [element.name])
         end
       end
+
+      return
+    end
+
+    if element.multiple_allowed? && content_data.is_a?(Array)
+      # turn into array
+      content_data = [content_data].flatten
+
+      if provider.nil?
+        # no provider, let's assume we're producing an explanatory example XML
+        xml.comment!("Multiple instances of #{element.name} allowed here")
+      end 
     else
-      xml.tag!(element.name, attributes_hash)
+      # make sure it's not an array
+      content_data = [content_data.to_s]
+    end
+
+    content_data.each_with_index do |dat, idx|
+      # each of the attribute values can be an array as well. If not,
+      # we'll just use it's single values for all instances of this node
+      current_attrs = attributes_hash.to_a.inject({}) do |result, key_value|
+        key = key_value[0]
+        value = key_value[1]
+
+        result.merge key => if value.is_a?(Array)
+          if value[idx]
+            value[idx]
+          else
+            content_id = stack + [element.name]
+            attr_id = content_id + ["@#{key}"]
+            logger.warn("XsdPopulator#build_element - data provider gave different length arrays for #{content_id.inspect} and #{attr_id.inspect}")
+            nil
+          end
+        else
+          value
+        end
+      end
+
+      xml.tag!(element.name, dat, current_attrs)
     end
   end
 end # class XsdPopulator
