@@ -85,12 +85,9 @@ class XsdPopulator
 
     logger.debug("XsdPopulator#build_element element: #{element.name}, stack: #{stack.inspect}")
 
-    if element.multiple_allowed?
-      xml.comment!("Multiple instances of #{element.name} allowed here")
-    end
-
     attributes_hash = element.attributes.inject({}) do |result, attribute|
-      attribute_data = provider.try_take(stack + [element.name, "@#{attribute.name}"])
+      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
+      attribute_data ||= attribute.type if provider.nil? # assume demo xml
       result.merge(attribute.name => attribute_data)
     end
 
@@ -100,8 +97,45 @@ class XsdPopulator
           build_element(xml, child, provider, stack + [element.name])
         end
       end
+
+      return
+    end
+
+    if element.multiple_allowed? && content_data.is_a?(Array)
+      # turn into array
+      content_data = [content_data].flatten
+
+      if provider.nil?
+        # no provider, let's assume we're producing an explanatory example XML
+        xml.comment!("Multiple instances of #{element.name} allowed here")
+      end 
     else
-      xml.tag!(element.name, content_data, attributes_hash)
+      # make sure it's not an array
+      content_data = [content_data.to_s]
+    end
+
+    content_data.each_with_index do |dat, idx|
+      # each of the attribute values can be an array as well. If not,
+      # we'll just use it's single values for all instances of this node
+      current_attrs = attributes_hash.to_a.inject({}) do |result, key_value|
+        key = key_value[0]
+        value = key_value[1]
+
+        result.merge key => if value.is_a?(Array)
+          if value[idx]
+            value[idx]
+          else
+            content_id = stack + [element.name]
+            attr_id = content_id + ["@#{key}"]
+            logger.warn("XsdPopulator#build_element - data provider gave different length arrays for #{content_id.inspect} and #{attr_id.inspect}")
+            nil
+          end
+        else
+          value
+        end
+      end
+
+      xml.tag!(element.name, dat, current_attrs)
     end
   end
 end # class XsdPopulator
