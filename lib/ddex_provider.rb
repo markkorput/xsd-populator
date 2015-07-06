@@ -24,8 +24,9 @@ module DdexProvider
   end # module MessageHeader
 
 
-  class Provider
+  class MessageHeaderProvider
     include DataProvider::Base
-    add_xml_provider MessageHeader
+    add_xml_provider MessageHeader, :scope => 'MessageHeader'
   end # class Provider
+
 end # module DdexProvider

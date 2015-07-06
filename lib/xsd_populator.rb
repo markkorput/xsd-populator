@@ -11,7 +11,7 @@ class XsdPopulator
   end
 
   def logger
-    @logger ||= Logger.new(STDOUT)
+    @logger ||= options[:logger] || Logger.new(STDOUT)
   end
 
   def xsd_reader
@@ -48,18 +48,18 @@ class XsdPopulator
 
       # log a warning message, informing that we disregard the other elements
       if target_el && xsd_reader.elements.length > 1
-        logger.info "Multiple root-level element definitions found in XSD schema, only processing the first one (#{target_el.name})"
+        logger.info "XsdPopulator#populate_xml - Multiple root-level element definitions found in XSD schema, only processing the first one (#{target_el.name})"
       end
     elsif target_el.nil?
-      logger.warn "Specified element (#{options[:element].inspect}) not found, aborting"
+      logger.warn "XsdPopulator#populate_xml - Specified element (#{options[:element].inspect}) not found, aborting"
       return nil
     else
-      logger.info "Starting at specified element: #{target_el.name}"
+      logger.info "XsdPopulator#populate_xml - Starting at specified element: #{target_el.name}"
     end
 
     # no element definition found? abort with warning
     if target_el.nil?
-      logger.warn 'No element definitions found in XSD schema, aborting'
+      logger.warn 'XsdPopulator#populate_xml - No element definitions found in XSD schema, aborting'
       return nil
     end
 
@@ -72,7 +72,9 @@ class XsdPopulator
   end
 
 
-  def build_element(xml, element, provider = nil, stack = [])
+  def build_element(xml, element, provider = self.provider, stack = [])
+    content_data = provider.nil? ? nil : provider.try_take(stack + [element.name])
+
     # TODO; more sophisticated recursion detection;
     # multiple elements of the same name should be able
     # to occur insid the stack
@@ -87,7 +89,10 @@ class XsdPopulator
       xml.comment!("Multiple instances of #{element.name} allowed here")
     end
 
-    attributes_hash = element.attributes.inject({}){|result, attribute| result.merge(attribute.name => attribute.type)}
+    attributes_hash = element.attributes.inject({}) do |result, attribute|
+      attribute_data = provider.try_take(stack + [element.name, "@#{attribute.name}"])
+      result.merge(attribute.name => attribute_data)
+    end
 
     if element.child_elements?  
       xml.tag!(element.name, attributes_hash) do
@@ -96,7 +101,7 @@ class XsdPopulator
         end
       end
     else
-      xml.tag!(element.name, attributes_hash)
+      xml.tag!(element.name, content_data, attributes_hash)
     end
   end
 end # class XsdPopulator
