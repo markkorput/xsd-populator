@@ -27,9 +27,8 @@ describe XsdPopulator do
     populator = XsdPopulator.new(:xsd_reader => @populator.xsd_reader, :element => ['NewReleaseMessage', 'MessageHeader'])
     # populator.write_file(File.dirname(__FILE__) + '/examples/ddex-ern-v36-MessageHeader.xml')
     doc = Nokogiri.XML(populator.populated_xml)
-
     expect(doc.root.name).to eq 'MessageHeader'
-    expect(doc.root.children.map(&:name)).to eq ["MessageThreadId", "MessageId", "MessageFileName", "MessageSender", "SentOnBehalfOf", "MessageRecipient", "MessageCreatedDateTime", "MessageAuditTrail", "Comment", "MessageControlType"]
+    expect(doc.root.element_children.map(&:name)).to eq ["MessageThreadId", "MessageId", "MessageFileName", "MessageSender", "SentOnBehalfOf", "MessageRecipient", "MessageCreatedDateTime", "MessageAuditTrail", "Comment", "MessageControlType"]
     expect(doc.root.at('MessageSender').at('PartyName').at('FullName').attributes['LanguageAndScriptCode'].value).to eq "xs:string"
     expect(doc.root.at('MessageSender').at('PartyName').at('FullNameAsciiTranscribed').attributes).to eq({})
   end
