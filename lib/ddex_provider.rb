@@ -61,6 +61,18 @@ module DdexProvider
     add_xml_provider MessageSender, :scope => 'MessageSender'
     add_xml_provider SentOnBehalfOf, :scope => 'SentOnBehalfOf'
     add_xml_provider MessageRecipient, :scope => 'MessageRecipient'
+
+    provider ['MessageAuditTrail', 'MessageAuditTrailEvent'] do
+      # gives three new data providers with each their own :name
+      ['John', 'Billy', 'Bob'].map do |name|
+        self.give(:name => name)
+      end
+    end
+
+    provider ['MessageAuditTrail', 'MessageAuditTrailEvent', 'MessagingPartyDescriptor', 'PartyName', 'FullName'], :requires => [:name] do
+      given(:name)
+    end
+
   end # module MessageHeader
 
 

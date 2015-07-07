@@ -98,7 +98,9 @@ module DataProvider
       end
 
       def given(param_name)
-        data[param_name]
+        return data[param_name] if data.has_key?(param_name)
+        logger.error "data provider expected missing data with identifier: #{param_name.inspect}"
+        # TODO: raise?
       end
 
       def give(_data = {})
