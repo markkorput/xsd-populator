@@ -31,6 +31,14 @@ class XsdPopulator
     File.write(path, populated_xml)
   end
 
+  def explain_xml?
+    provider.nil?
+  end
+
+  def build_node_without_provider?
+    options[:require_providers] != true || explain_xml?
+  end
+
   private
 
   def populate_xml
@@ -47,7 +55,65 @@ class XsdPopulator
     return xml.target!
   end
 
-  def attribute_data_hash_for(element, provider, stack)
+  def build_element(xml, element, provider = self.provider, stack = [])
+    # TODO; more sophisticated recursion detection;
+    # multiple elements of the same name should be able
+    # to occur insid the stack
+    if stack.include?(element.name)
+      logger.warn("XsdPopulator#build_element aborting because of potential endless recursion\nCurrent element: #{element.name}\nstack: #{stack.inspect}")
+      return
+    end
+
+    # let's log positive stuff as well
+    logger.debug("XsdPopulator#build_element element: #{element.name}, stack: #{stack.inspect}")
+
+    # get node content data from provider
+    content_data = provider.nil? ? nil : provider.try_take(stack + [element.name])
+    # get attributes content from the provider
+    attributes_data_hash = attributes_data_hash_for(element, provider, stack)
+
+    if explain_xml? && element.multiple_allowed?
+      xml.comment!("Multiple instances of #{element.name} allowed here")
+    end 
+
+    # just log a warning if we got an array value for an element that is not allowed
+    # to occurs multiple times according to the XSD schema (but still allow data provider to generate the xml)
+    if content_data.is_a?(Array) && !element.multiple_allowed?
+      logger.warn("Got array value (provider id: #{(stack + [element.name]).inspect}) but element definition doesn't allow multiple instances")
+    end
+
+    # make sure it's an array
+    content_data = [content_data].flatten # if element.multiple_allowed? && content_data.is_a?(Array)
+    # NOTE: this doesn't array-values for single elements, which we don't support (would be turned into a string anway)
+
+    content_data.each_with_index do |node_content, idx|
+      attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
+
+      if element.child_elements?
+        # skip creating a complex node if we didn't get a data provider for it
+        next if !build_node_without_provider?
+
+        # create complex node
+        xml.tag!(element.name, attributes_hash) do
+          # loop over all child node definitions
+          element.elements.each do |child|
+            # this method call itself recursively for every child node definition of the current element
+            build_element(xml, child, node_content || provider, stack + [element.name])
+          end
+        end
+      else
+        # simple node; name, value, attributes
+        xml.tag!(element.name, node_content, attributes_hash)
+      end
+    end
+  end
+
+
+  #
+  # Attribute data
+  #
+
+  def attributes_data_hash_for(element, provider, stack)
     element.attributes.inject({}) do |result, attribute|
       attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
       attribute_data ||= attribute.type if provider.nil? # assume demo xml
@@ -75,67 +141,10 @@ class XsdPopulator
     end
   end
 
-  def build_element(xml, element, provider = self.provider, stack = [])
-    # TODO; more sophisticated recursion detection;
-    # multiple elements of the same name should be able
-    # to occur insid the stack
-    if stack.include?(element.name)
-      logger.warn("XsdPopulator#build_element aborting because of potential endless recursion\nCurrent element: #{element.name}\nstack: #{stack.inspect}")
-      return
-    end
 
-    logger.debug("XsdPopulator#build_element element: #{element.name}, stack: #{stack.inspect}")
-    content_data = provider.nil? ? nil : provider.try_take(stack + [element.name])
-
-    attributes_data_hash = attribute_data_hash_for(element, provider, stack)
-
-    if element.child_elements?  
-      xml.tag!(element.name, attributes_data_hash) do
-        element.elements.each do |child|
-          build_element(xml, child, provider, stack + [element.name])
-        end
-      end
-
-      return
-    end
-
-    if element.multiple_allowed? && content_data.is_a?(Array)
-      # turn into array
-      content_data = [content_data].flatten
-
-      if provider.nil?
-        # no provider, let's assume we're producing an explanatory example XML
-        xml.comment!("Multiple instances of #{element.name} allowed here")
-      end 
-    else
-      # make sure it's not an array
-      content_data = [content_data.to_s]
-    end
-
-    content_data.each_with_index do |dat, idx|
-      # # each of the attribute values can be an array as well. If not,
-      # # we'll just use it's single values for all instances of this node
-      # current_attrs = attributes_hash.to_a.inject({}) do |result, key_value|
-      #   key = key_value[0]
-      #   value = key_value[1]
-
-      #   result.merge key => if value.is_a?(Array)
-      #     if value[idx]
-      #       value[idx]
-      #     else
-      #       content_id = stack + [element.name]
-      #       attr_id = content_id + ["@#{key}"]
-      #       logger.warn("XsdPopulator#build_element - data provider gave different length arrays for #{content_id.inspect} and #{attr_id.inspect}")
-      #       nil
-      #     end
-      #   else
-      #     value
-      #   end
-      # end
-      attribute_hash = attributes_hash_for_index(attributes_data_hash, idx)
-      xml.tag!(element.name, dat, attribute_hash)
-    end
-  end
+  #
+  # Root element
+  #
 
   def specified_xsd_element
     # nothing specified
