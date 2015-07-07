@@ -38,6 +38,8 @@ describe 'DdexProvider' do
     expect(doc.root.search('SentOnBehalfOf/PartyId').map{|node| node.attributes['IsDPID'].value}).to eq ['true', 'false', '']
     expect(doc.root.search('MessageRecipient/PartyId').map(&:text)).to eq ['12', '34', '56']
     expect(doc.root.search('MessageRecipient/PartyId').map{|node| node.attributes['IsDPID'].value}).to eq ['TRUTH']*3
+    expect(doc.root.search('MessageAuditTrail/MessageAuditTrailEvent').length).to eq 3
+    expect(doc.root.search('MessageAuditTrail/MessageAuditTrailEvent/MessagingPartyDescriptor/PartyName/FullName').map(&:text)).to eq ['John', 'Billy', 'Bob']
   end
 
 end # describe 'DdexProvider'
