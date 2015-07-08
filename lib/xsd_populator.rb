@@ -15,11 +15,11 @@ class XsdPopulator
   end
 
   def xsd_file
-    options[:xsd_file]
+    options[:xsd_file] || options[:xsd]
   end
 
   def xsd_reader
-    options[:xsd_reader] || (options[:xsd_file].nil? ? nil : XsdReader::XML.new(:xsd_file => options[:xsd_file]))
+    options[:xsd_reader] || (xsd_file.nil? ? nil : XsdReader::XML.new(:xsd_file => xsd_file))
   end
 
   def provider
@@ -28,6 +28,10 @@ class XsdPopulator
 
   def populated_xml
     @populated_xml ||= populate_xml
+  end
+
+  def populate_element(element_specifier = nil)
+    element_specifier.nil? ? populated_xml : populate_xml(element_specifier)
   end
 
   def write_file(path)
@@ -45,8 +49,8 @@ class XsdPopulator
 
   private
 
-  def populate_xml
-    if (root_el = root_xsd_element).nil?
+  def populate_xml(element_specifier = nil)
+    if (root_el = root_xsd_element(element_specifier)).nil?
       logger.warn "Couldn't find element definition, aborting"
       return nil
     end
@@ -54,7 +58,9 @@ class XsdPopulator
     xml = Builder::XmlMarkup.new(:indent => 2)
     xml.instruct!
 
-    build_element(xml, root_el)
+    stack = [element_specifier].flatten.compact[0..-1]
+    stack.pop
+    build_element(xml, root_el, self.provider, stack)
 
     return xml.target!
   end
@@ -150,19 +156,19 @@ class XsdPopulator
   # Root element
   #
 
-  def specified_xsd_element
+  def specified_xsd_element(specifier = nil)
     # nothing specified
-    return nil if options[:element].nil?
+    return nil if (specifier || options[:element]).nil?
     # find specified element
-    el = xsd_reader[[options[:element]].flatten.compact]
+    el = xsd_reader[[(specifier || options[:element])].flatten.compact]
     # log warning if specified element not found
     logger.warn "XsdPopulator#populate_xml - Specified element (#{options[:element].inspect}) not found, reverting to default" if el.nil?
     # return result
     return el
   end
 
-  def root_xsd_element
-    el = specified_xsd_element
+  def root_xsd_element(specifier = nil)
+    el = specified_xsd_element(specifier)
 
     # no element specified? (or found)
     if el
