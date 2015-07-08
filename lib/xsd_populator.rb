@@ -14,8 +14,12 @@ class XsdPopulator
     @logger ||= options[:logger] || Logger.new(STDOUT)
   end
 
+  def xsd_file
+    options[:xsd_file]
+  end
+
   def xsd_reader
-    options[:xsd_reader]
+    options[:xsd_reader] || (options[:xsd_file].nil? ? nil : XsdReader::XML.new(:xsd_file => options[:xsd_file]))
   end
 
   def provider

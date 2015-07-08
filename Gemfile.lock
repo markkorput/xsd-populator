@@ -3,6 +3,13 @@ PATH
   specs:
     xsd-populator (0.0.1)
       builder
+      data-provider (>= 0.0.1)
+      xsd-reader (>= 0.0.1)
+
+PATH
+  remote: /srv/data-provider
+  specs:
+    data-provider (0.0.1)
 
 PATH
   remote: /srv/xsd-reader
@@ -40,6 +47,7 @@ PLATFORMS
 
 DEPENDENCIES
   byebug
+  data-provider!
   nokogiri
   rspec
   xsd-populator!
