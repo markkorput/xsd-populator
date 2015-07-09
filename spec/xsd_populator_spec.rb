@@ -39,7 +39,7 @@ describe XsdPopulator do
 
   describe "#uncache" do
     it "lets you clear the populated_xml cache" do
-      # first create a dummy cache, because producng the full XML will take too much time
+      # first create a dummy cache, because producing the full XML will take too much time
       populator.instance_variable_set('@populated_xml', :dummy_value)
       # verify the above instance variable is used to cache populaed_xml
       expect(populator.populated_xml).to eq :dummy_value
@@ -82,7 +82,8 @@ describe "XsdPopulator for partial layouts" do
     XsdPopulator.new({
       :element => ['NewReleaseMessage', 'MessageHeader'],
       :reader=> xsd_reader,
-      :logger => logger
+      :logger => logger,
+      :strategy => :complete
     })
   }
 
@@ -138,5 +139,61 @@ describe "XsdPopulator for partial layouts" do
     end
   end
 
-  it "is should by default only add complex nodes without data provider if there are providers available for child nodes"
+  describe :strategy do
+    class StrategyProvider
+      include DataProvider::Base
+
+      provides({
+        ['NewReleaseMessage', 'DealList', 'ReleaseDeal'] => 'Invalid value; ReleaseDeal is a complex node with child-nodes, it should get a DataProvider, not a string',
+        ['NewReleaseMessage', 'ReleaseList'] => 'Invalid again',
+        ['NewReleaseMessage', 'ResourceList'] => StrategyProvider.new,
+        ['NewReleaseMessage', 'WorkList', 'MusicalWork', 'MusicalWorkId'] => lambda{ [StrategyProvider.new] * 3 }
+      })
+    end
+
+    let(:populator){
+      XsdPopulator.new({
+        # :element => ['NewReleaseMessage', 'MessageHeader'], # We're going for 'FULL' render this time 
+        :reader => xsd_reader,
+        :provider => StrategyProvider.new,
+        :logger => logger
+      })
+    }
+
+    it "defaults to the :smart strategy which doesn't add nodes for which no (valid) data is provided, unless there are providers available for any its offspring nodes" do
+      xml = populator.populated_xml
+      doc = Nokogiri.XML(xml)
+      # There's a provider available for ReleaseDeal, an offspring of DealList, and
+      # even though it will return invalid data, it will still cause the DealList node to be created
+      expect(doc.search("/NewReleaseMessage/DealList").length).to eq 1
+      expect(doc.search("/NewReleaseMessage/DealList/ReleaseDeal").length).to eq 0
+      # There is a provider for ReleaseList itself, but it returns invalid data; it will not be created
+      expect(doc.search("/NewReleaseMessage/ReleaseList").length).to eq 0
+      # There is a provider with valid data (a DataProvider object) for ResourceList, it will be created
+      expect(doc.search("/NewReleaseMessage/ResourceList").length).to eq 1
+      # There is no data provider for WorkList, but there is for one of it descendents so it's created
+      expect(doc.search("/NewReleaseMessage/WorkList").length).to eq 1
+      # for MusicalWorkId multiple data providers are provided,
+      # so multiple nodes will be created. All of them will be empty though...
+      expect(doc.search("/NewReleaseMessage/WorkList/MusicalWork/MusicalWorkId").map{|mw| mw.element_children.length}).to eq [0]*3
+    end
+
+    it "adds empty simple nodes when :strategy is :all_simple_elements" do
+      populator.configure(:strategy => :nil_to_empty)
+      doc = Nokogiri.XML(xml = populator.populated_xml)
+      expect(doc.search("/NewReleaseMessage/DealList").length).to eq 1 # jsut like 
+      expect(doc.search("/NewReleaseMessage/DealList/ReleaseDeal").length).to eq 0
+      expect(doc.search("/NewReleaseMessage/ReleaseList").length).to eq 0
+      expect(doc.search("/NewReleaseMessage/ResourceList").length).to eq 1
+      expect(doc.search("/NewReleaseMessage/WorkList").length).to eq 1
+      expect(doc.search("/NewReleaseMessage/WorkList/MusicalWork/MusicalWorkId").map{|mw| mw.element_children.length}).to eq [4]*3
+    end
+
+    it "builds all the nodes it can find if the :strategy option is set to :complete" do
+      populator.configure(:strategy => :complete, :element => ['NewReleaseMessage', 'WorkList'])
+      doc = Nokogiri.XML(xml = populator.populated_xml)
+      expect(doc.search("/WorkList").length).to eq 1
+      expect(doc.search("/WorkList/MusicalWork/MusicalWorkId").map{|n| n.search("./ISWC").length}).to eq [1]*3
+    end
+  end
 end

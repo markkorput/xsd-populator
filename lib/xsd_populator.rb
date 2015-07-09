@@ -19,6 +19,7 @@ class XsdPopulator
     # remove some cached values
     @logger = nil if _opts[:logger]
     @xsd_reader = nil if _opts[:xsd_reader] || _opts[:reader]
+    uncache if _opts[:strategy]
   end
 
   def uncache
@@ -60,14 +61,6 @@ class XsdPopulator
     File.write(path, populated_xml)
   end
 
-  def explain_xml?
-    provider == default_provider
-  end
-
-  def build_node_without_provider?
-    options[:require_providers] != true || explain_xml?
-  end
-
   private
 
   def populate_xml(element_specifier = nil)
@@ -91,7 +84,7 @@ class XsdPopulator
     # multiple elements of the same name should be able
     # to occur insid the stack
     if stack.include?(element.name)
-      logger.warn("XsdPopulator#build_element aborting because of potential endless recursion\nCurrent element: #{element.name}\nstack: #{stack.inspect}")
+      logger.warn("XsdPopulator#build_element aborting because of potential endless recursion\n - Current element: #{element.name}\n - stack: #{stack.inspect}")
       return
     end
 
@@ -118,30 +111,33 @@ class XsdPopulator
     # NOTE: this doesn't array-values for single elements, which we don't support (would be turned into a string anway)
 
     content_data.each_with_index do |node_content, idx|
+      # let's see if the provided data is good for building this node, accoridng to the current strategy
+      next if !build?(element, provider, stack, :content => node_content)
+
       attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
 
-      if element.child_elements?
-        # skip creating a complex node if we didn't get a data provider for it
-        next if !build_node_without_provider?
-
-        if node_content.respond_to?(:try_take)
-          child_provider = node_content
-        else
-          logger.warn "Got non-nil and non-provider value for element with child elements (value: #{node_content}, element: #{element.name}, stack: #{stack.inspect})" if node_content
-          child_provider = provider
-        end
-
-        # create complex node
-        xml.tag!(element.name, attributes_hash) do
-          # loop over all child node definitions
-          element.elements.each do |child|
-            # this method call itself recursively for every child node definition of the current element
-            build_element(xml, child, child_provider, stack + [element.name])
-          end
-        end
-      else
-        # simple node; name, value, attributes
+      # simple node; name, value, attributes
+      if !element.child_elements?
         xml.tag!(element.name, node_content, attributes_hash)
+        next
+      end
+
+      # complex node
+      if node_content.respond_to?(:try_take)
+        child_provider = node_content
+      else
+        logger.warn "Got non-nil and non-provider value for element with child elements (value: #{node_content}, element: #{element.name}, stack: #{stack.inspect})" if node_content
+        # strategy dictates to continue; just use the current element's provider for its children
+        child_provider = provider
+      end
+
+      # create complex node
+      xml.tag!(element.name, attributes_hash) do
+        # loop over all child node definitions
+        element.elements.each do |child|
+          # this method call itself recursively for every child node definition of the current element
+          build_element(xml, child, child_provider, stack + [element.name])
+        end
       end
     end
   end
@@ -159,7 +155,7 @@ class XsdPopulator
     end
   end
 
-  def atrribute_value_for_index(values, idx)
+  def attribute_value_for_index(values, idx)
     # if the provided attribute content is an array, just use the appropriate element
     # if the array does not have enough element, this will default to nil
     # if values is not an array, just always use its singular value
@@ -174,7 +170,7 @@ class XsdPopulator
       key = key_value[0]
       value = key_value[1]
       logger.warn "XsdPopulator#attributes_hash_for_index - got an array with insufficient values for attribute `#{key}`. Attribute data hash: #{attribute_data_hash}, index: #{idx}" if value.is_a?(Array) && value.length <= idx
-      attr_value = atrribute_value_for_index(value, idx)
+      attr_value = attribute_value_for_index(value, idx)
       result.merge(key => attr_value)
     end
   end
@@ -213,6 +209,47 @@ class XsdPopulator
     end
 
     return el
+  end
+
+  #
+  # Strategy
+  #
+  public
+
+  def strategy
+    options[:strategy] || (explain_xml? ? :complete : :smart)
+  end
+
+  def explain_xml?
+    provider == default_provider
+  end
+
+  def build_node_without_provider?
+    strategy == :complete
+  end
+
+  def add_simple_nodes_without_data?
+    strategy == :nil_to_empty || strategy == :complete
+  end
+
+  def build?(element, provider, stack, opts = {})
+    content = opts[:content] || provider.try_take([stack, element.name].flatten.compact)
+
+    # For comlex nodes we need either;
+    # - a data provider or
+    # - explicit confirmation to build without providers or
+    # - providers available for offspring elements
+    if element.child_elements? 
+      return content.respond_to?(:try_take) || build_node_without_provider? || provider.has_providers_with_scope?(stack + [element.name])
+    end
+
+    # we got a non-nil value for a simple node? Go ahead
+    return true if content || add_simple_nodes_without_data?
+
+    return false
+
+    # !build_node_without_provider? || 
+    # return true if provider
   end
 
 end # class XsdPopulator

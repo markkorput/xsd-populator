@@ -23,7 +23,7 @@ describe DdexProvider do
 
     @provider = DdexProvider::MessageHeaderProvider.new(:logger => logger)
     @xsd_reader = XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
-    @populator = XsdPopulator.new(:xsd_reader => @xsd_reader, :data_provider => @provider, :element => ['NewReleaseMessage', 'MessageHeader'], :relative_provider => true, :logger => logger)
+    @populator = XsdPopulator.new(:xsd_reader => @xsd_reader, :data_provider => @provider, :element => ['NewReleaseMessage', 'MessageHeader'], :relative_provider => true, :logger => logger, :strategy => :complete)
   end
 
   it "uses provider data to populate the xsd schema" do
