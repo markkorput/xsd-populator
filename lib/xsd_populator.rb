@@ -1,13 +1,28 @@
 require 'bundler/setup'
 require 'builder'
 require 'xsd_reader'
+require 'xsd_explanation_provider'
 
 class XsdPopulator
+
+  class ElementNotFoundException < Exception
+  end
 
   attr_reader :options
 
   def initialize(_opts = {})
-    @options = _opts.is_a?(Hash) ? _opts : {}
+    configure _opts
+  end
+
+  def configure _opts = {}
+    @options = (@options || {}).merge(_opts.is_a?(Hash) ? _opts : {})
+    # remove some cached values
+    @logger = nil if _opts[:logger]
+    @xsd_reader = nil if _opts[:xsd_reader] || _opts[:reader]
+  end
+
+  def uncache
+    @populated_xml = nil
   end
 
   def logger
@@ -19,11 +34,17 @@ class XsdPopulator
   end
 
   def xsd_reader
-    options[:xsd_reader] || (xsd_file.nil? ? nil : XsdReader::XML.new(:xsd_file => xsd_file))
+    @xsd_reader ||= options[:xsd_reader] || options[:reader] || (xsd_file.nil? ? nil : XsdReader::XML.new(:xsd_file => xsd_file))
   end
 
+  alias :reader :xsd_reader
+
   def provider
-    options[:provider] || options[:data_provider]
+    options[:provider] || options[:data_provider] || default_provider
+  end
+
+  def default_provider
+    @default_provider ||= XsdExplanationProvider.new(:data => {:xsd_reader => xsd_reader}, :logger => logger)
   end
 
   def populated_xml
@@ -40,7 +61,7 @@ class XsdPopulator
   end
 
   def explain_xml?
-    provider.nil?
+    provider == default_provider
   end
 
   def build_node_without_provider?
@@ -58,7 +79,7 @@ class XsdPopulator
     xml = Builder::XmlMarkup.new(:indent => 2)
     xml.instruct!
 
-    stack = [element_specifier].flatten.compact[0..-1]
+    stack = options[:relative_provider] == true ? [] : [element_specifier || options[:element]].flatten.compact
     stack.pop
     build_element(xml, root_el, self.provider, stack)
 
@@ -103,12 +124,19 @@ class XsdPopulator
         # skip creating a complex node if we didn't get a data provider for it
         next if !build_node_without_provider?
 
+        if node_content.respond_to?(:try_take)
+          child_provider = node_content
+        else
+          logger.warn "Got non-nil and non-provider value for element with child elements (value: #{node_content}, element: #{element.name}, stack: #{stack.inspect})" if node_content
+          child_provider = provider
+        end
+
         # create complex node
         xml.tag!(element.name, attributes_hash) do
           # loop over all child node definitions
           element.elements.each do |child|
             # this method call itself recursively for every child node definition of the current element
-            build_element(xml, child, node_content || provider, stack + [element.name])
+            build_element(xml, child, child_provider, stack + [element.name])
           end
         end
       else
@@ -155,12 +183,12 @@ class XsdPopulator
   #
   # Root element
   #
-
   def specified_xsd_element(specifier = nil)
     # nothing specified
     return nil if (specifier || options[:element]).nil?
     # find specified element
     el = xsd_reader[[(specifier || options[:element])].flatten.compact]
+    raise ElementNotFoundException.new(:message => "Could not find specified root element (#{(specifier || options[:element]).inspect}).") if el.nil?
     # log warning if specified element not found
     logger.warn "XsdPopulator#populate_xml - Specified element (#{options[:element].inspect}) not found, reverting to default" if el.nil?
     # return result

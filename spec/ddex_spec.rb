@@ -3,11 +3,10 @@ require File.dirname(__FILE__) + '/spec_helper'
 require 'ddex_provider'
 
 describe DdexProvider::MessageHeaderProvider do
-
   before :all do
-    @logger = Logger.new(STDOUT)
-    @logger.level = Logger::INFO
-    @provider = DdexProvider::MessageHeaderProvider.new(:logger => @logger)
+    logger = Logger.new(STDOUT)
+    logger.level = Logger::WARN
+    @provider = DdexProvider::MessageHeaderProvider.new(:logger => logger)
   end
 
   it 'provides MessageHeader xml information' do
@@ -17,19 +16,20 @@ describe DdexProvider::MessageHeaderProvider do
   end
 end
 
-describe 'DdexProvider' do
+describe DdexProvider do
   before :all do
-    @logger = Logger.new(STDOUT)
-    @logger.level = Logger::INFO
+    logger = Logger.new(STDOUT)
+    logger.level = Logger::FATAL
 
-    @provider = DdexProvider::MessageHeaderProvider.new(:logger => @logger)
+    @provider = DdexProvider::MessageHeaderProvider.new(:logger => logger)
     @xsd_reader = XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
-    @populator = XsdPopulator.new(:xsd_reader => @xsd_reader, :data_provider => @provider, :element => ['NewReleaseMessage', 'MessageHeader'], :logger => @logger)
+    @populator = XsdPopulator.new(:xsd_reader => @xsd_reader, :data_provider => @provider, :element => ['NewReleaseMessage', 'MessageHeader'], :relative_provider => true, :logger => logger)
   end
 
   it "uses provider data to populate the xsd schema" do
     doc = Nokogiri.XML(@populator.populated_xml)
     expect(doc.root.name).to eq 'MessageHeader'
+    # byebug
     expect(doc.root.at('MessageThreadId').text).to eq '123'
     expect(doc.root.attributes['LanguageAndScriptCode'].value).to eq 'NL'
     expect(doc.root.at('MessageSender/PartyId').text).to eq '404'
@@ -41,5 +41,4 @@ describe 'DdexProvider' do
     expect(doc.root.search('MessageAuditTrail/MessageAuditTrailEvent').length).to eq 3
     expect(doc.root.search('MessageAuditTrail/MessageAuditTrailEvent/MessagingPartyDescriptor/PartyName/FullName').map(&:text)).to eq ['John', 'Billy', 'Bob']
   end
-
-end # describe 'DdexProvider'
+end # describe DdexProvider

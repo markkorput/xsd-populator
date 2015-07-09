@@ -58,9 +58,9 @@ module DdexProvider
       123.to_s
     end
 
-    add_xml_provider MessageSender, :scope => 'MessageSender'
-    add_xml_provider SentOnBehalfOf, :scope => 'SentOnBehalfOf'
-    add_xml_provider MessageRecipient, :scope => 'MessageRecipient'
+    add_scoped MessageSender, :scope => 'MessageSender'
+    add_scoped SentOnBehalfOf, :scope => 'SentOnBehalfOf'
+    add_scoped MessageRecipient, :scope => 'MessageRecipient'
 
     provider ['MessageAuditTrail', 'MessageAuditTrailEvent'] do
       # gives three new data providers with each their own :name
@@ -78,7 +78,7 @@ module DdexProvider
 
   class MessageHeaderProvider
     include DataProvider::Base
-    add_xml_provider MessageHeader, :scope => 'MessageHeader'
+    add_scoped MessageHeader, :scope => 'MessageHeader'
   end # class Provider
 
 end # module DdexProvider
