@@ -147,7 +147,8 @@ describe "XsdPopulator for partial layouts" do
         ['NewReleaseMessage', 'DealList', 'ReleaseDeal'] => 'Invalid value; ReleaseDeal is a complex node with child-nodes, it should get a DataProvider, not a string',
         ['NewReleaseMessage', 'ReleaseList'] => 'Invalid again',
         ['NewReleaseMessage', 'ResourceList'] => StrategyProvider.new,
-        ['NewReleaseMessage', 'WorkList', 'MusicalWork', 'MusicalWorkId'] => lambda{ [StrategyProvider.new] * 3 }
+        ['NewReleaseMessage', 'WorkList', 'MusicalWork', 'MusicalWorkId'] => lambda{ [StrategyProvider.new] * 3 },
+        ['NewReleaseMessage', 'MessageHeader', 'SentOnBehalfOf', '@LanguageAndScriptCode'] => 'UK'
       })
     end
 
@@ -194,6 +195,17 @@ describe "XsdPopulator for partial layouts" do
       doc = Nokogiri.XML(xml = populator.populated_xml)
       expect(doc.search("/WorkList").length).to eq 1
       expect(doc.search("/WorkList/MusicalWork/MusicalWorkId").map{|n| n.search("./ISWC").length}).to eq [1]*3
+    end
+
+    it "by default doesn't add provider-less attributes" do
+      xml = populator.populated_xml
+      doc = Nokogiri.XML(xml)
+      expect(doc.at("/NewReleaseMessage").attributes['MessageSchemaVersionId'].value).to eq '' # required attribute
+      expect(doc.at("/NewReleaseMessage").attributes['ReleaseProfileVersionId']).to eq nil
+      expect(doc.at("/NewReleaseMessage").attributes['LanguageAndScriptCode']).to eq nil
+      expect(doc.at("/NewReleaseMessage").attributes['LanguageAndScriptCode']).to eq nil
+      expect(doc.at("/NewReleaseMessage/MessageHeader").attributes['LanguageAndScriptCode']).to eq nil
+      expect(doc.at("/NewReleaseMessage/MessageHeader/SentOnBehalfOf").attributes['LanguageAndScriptCode'].value).to eq 'UK'
     end
   end
 end

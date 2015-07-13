@@ -150,8 +150,12 @@ class XsdPopulator
   def attributes_data_hash_for(element, provider, stack)
     element.attributes.inject({}) do |result, attribute|
       attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
-      attribute_data ||= attribute.type if provider.nil? # assume demo xml
-      result.merge(attribute.name => attribute_data)
+      # attribute_data ||= attribute.type if provider.nil? # assume demo xml
+      if add_attribute?(attribute, provider, stack, :content => attribute_data)
+        result.merge(attribute.name => attribute_data)
+      else
+        result
+      end
     end
   end
 
@@ -252,5 +256,14 @@ class XsdPopulator
     # return true if provider
   end
 
+  def add_empty_attributes?
+    strategy == :nil_to_empty || strategy == :complete
+  end
+
+  def add_attribute?(attribute, provider, stack = [], opts = {})
+    return true if attribute.required?
+    content = opts[:content] || provider.try_take(stack + ["@#{attribute.name}"])
+    return (!content.nil?) || add_empty_attributes?
+  end
 end # class XsdPopulator
 
