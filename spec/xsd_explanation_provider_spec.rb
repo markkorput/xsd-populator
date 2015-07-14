@@ -5,7 +5,7 @@ describe XsdExplanationProvider do
   let(:logger){
     logger = Logger.new(STDOUT)
     logger.level = Logger::WARN
-    logger    
+    logger
   }
 
   let(:populator){
@@ -13,11 +13,11 @@ describe XsdExplanationProvider do
   }
 
   let(:provider){
-    XsdExplanationProvider.new(:data => {:xsd_reader => populator.xsd_reader})
+    XsdExplanationProvider.new(:data => {:xsd_reader => populator.xsd_reader}, :logger => logger)
   }
 
   it "requires an xsd reader" do
-    msg = expect{ XsdExplanationProvider.new.take(:something) }.to raise_error(RuntimeError, 'XsdExplanationProvider needs an xsd reader')
+    msg = expect{ XsdExplanationProvider.new(:logger => logger).take(:something) }.to raise_error(RuntimeError, 'XsdExplanationProvider needs an xsd reader')
   end
 
   it "gives itself for complex elements" do
@@ -40,7 +40,5 @@ describe XsdExplanationProvider do
     doc = Nokogiri.XML(xml)
     expect(doc.at('/MessageSender/PartyId').text).to eq 'xs:string'
     expect(doc.at('/MessageSender').attributes['LanguageAndScriptCode'].value).to eq 'xs:string'
-
-      # PartyId
   end
 end # describe XsdExplanationProvider

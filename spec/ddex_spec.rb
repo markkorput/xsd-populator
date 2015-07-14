@@ -3,31 +3,44 @@ require File.dirname(__FILE__) + '/spec_helper'
 require 'ddex_provider'
 
 describe DdexProvider::MessageHeaderProvider do
-  before :all do
+  let(:logger){
     logger = Logger.new(STDOUT)
     logger.level = Logger::WARN
-    @provider = DdexProvider::MessageHeaderProvider.new(:logger => logger)
-  end
+    logger    
+  }
+
+  let(:provider){
+    DdexProvider::MessageHeaderProvider.new(:logger => logger)
+  }
 
   it 'provides MessageHeader xml information' do
-    expect(@provider.take(['MessageHeader', '@LanguageAndScriptCode'])).to eq 'NL'
-    expect(@provider.take(['MessageHeader', 'MessageThreadId'])).to eq '123'
-    expect(@provider.take(['MessageHeader', 'MessageSender', 'PartyId'])).to eq 404
+    expect(provider.take(['MessageHeader', '@LanguageAndScriptCode'])).to eq 'NL'
+    expect(provider.take(['MessageHeader', 'MessageThreadId'])).to eq '123'
+    expect(provider.take(['MessageHeader', 'MessageSender', 'PartyId'])).to eq 404
   end
 end
 
 describe DdexProvider do
-  before :all do
+  let(:logger){
     logger = Logger.new(STDOUT)
-    logger.level = Logger::FATAL
+    logger.level = Logger::WARN
+    logger    
+  }
 
-    @provider = DdexProvider::MessageHeaderProvider.new(:logger => logger)
-    @xsd_reader = XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
-    @populator = XsdPopulator.new(:xsd_reader => @xsd_reader, :data_provider => @provider, :element => ['NewReleaseMessage', 'MessageHeader'], :relative_provider => true, :logger => logger, :strategy => :complete)
-  end
+  let(:provider){
+    DdexProvider::MessageHeaderProvider.new(:logger => logger)
+  }
+
+  let(:xsd_reader){
+    XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')), :logger => logger)
+  }
+
+  let(:populator){
+    XsdPopulator.new(:xsd_reader => xsd_reader, :data_provider => provider, :element => ['NewReleaseMessage', 'MessageHeader'], :relative_provider => true, :logger => logger, :strategy => :complete)
+  }
 
   it "uses provider data to populate the xsd schema" do
-    doc = Nokogiri.XML(@populator.populated_xml)
+    doc = Nokogiri.XML(populator.populated_xml)
     expect(doc.root.name).to eq 'MessageHeader'
     # byebug
     expect(doc.root.at('MessageThreadId').text).to eq '123'

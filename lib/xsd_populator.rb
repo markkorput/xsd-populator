@@ -27,7 +27,10 @@ class XsdPopulator
   end
 
   def logger
-    @logger ||= options[:logger] || Logger.new(STDOUT)
+    return @logger || options[:logger] if @logger || options[:logger]
+    @logger = Logger.new(STDOUT)
+    @logger.level = Logger::WARN
+    return @logger
   end
 
   def xsd_file
@@ -35,7 +38,7 @@ class XsdPopulator
   end
 
   def xsd_reader
-    @xsd_reader ||= options[:xsd_reader] || options[:reader] || (xsd_file.nil? ? nil : XsdReader::XML.new(:xsd_file => xsd_file))
+    @xsd_reader ||= options[:xsd_reader] || options[:reader] || (xsd_file.nil? ? nil : XsdReader::XML.new(:xsd_file => xsd_file, :logger => logger))
   end
 
   alias :reader :xsd_reader
