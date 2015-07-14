@@ -7,6 +7,10 @@ Gem::Specification.new do |s|
   s.files = `git ls-files`.split($/)
   s.executables = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
 
+  s.add_dependency 'builder'
+  s.add_dependency 'xsd-reader', '>= 0.0.1'
+  s.add_dependency 'data-provider', '>= 0.0.1'
+  s.add_development_dependency 'nokogiri'
   s.add_development_dependency 'rspec'
   s.add_development_dependency 'byebug'
 
