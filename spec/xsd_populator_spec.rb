@@ -209,3 +209,34 @@ describe "XsdPopulator for partial layouts" do
     end
   end
 end
+
+describe XsdPopulator::Informer do
+  class InformProvider
+    include DataProvider::Base
+
+    provides(['NewReleaseMessage', 'MessageHeader'] => XsdPopulator::Informer.new(:skip => true))
+    provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+  end
+
+  let(:xsd_reader){
+    XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
+  }
+
+  let(:logger){
+    logger = Logger.new(STDOUT)
+    logger.level = Logger::WARN
+    logger    
+  }
+
+  let(:populator){
+    XsdPopulator.new({
+      :reader=> xsd_reader,
+      :logger => logger,
+      :provider => InformProvider.new
+    })
+  }
+
+  it "informs the populator to skip an element" do
+    expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/MessageHeader')).to eq nil
+  end
+end

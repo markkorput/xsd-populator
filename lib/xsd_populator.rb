@@ -8,6 +8,18 @@ class XsdPopulator
   class ElementNotFoundException < Exception
   end
 
+  class Informer
+    attr_reader :options
+
+    def initialize(_opts = {})
+      @options = _opts || {}
+    end
+
+    def skip?
+      options[:skip] == true
+    end
+  end # class Informer
+
   attr_reader :options
 
   def initialize(_opts = {})
@@ -241,6 +253,9 @@ class XsdPopulator
 
   def build?(element, provider, stack, opts = {})
     content = opts[:content] || provider.try_take([stack, element.name].flatten.compact)
+
+    # we got an Informer object that tells us explicitly to skip this node? Yes sir.
+    return false if content.is_a?(Informer) && content.skip?
 
     # For comlex nodes we need either;
     # - a data provider or
