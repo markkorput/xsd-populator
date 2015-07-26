@@ -76,6 +76,10 @@ class XsdPopulator
     File.write(path, populated_xml)
   end
 
+  def max_recursion
+    options[:max_recursion] || 3
+  end
+
   private
 
   def populate_xml(element_specifier = nil)
@@ -94,11 +98,15 @@ class XsdPopulator
     return xml.target!
   end
 
+  def stack_recursion_count(stack = [])
+    stack.select{|el| el == stack.last}.length - 1
+  end
+
   def build_element(xml, element, provider = self.provider, stack = [])
     # TODO; more sophisticated recursion detection;
     # multiple elements of the same name should be able
     # to occur insid the stack
-    if stack.include?(element.name)
+    if stack_recursion_count(stack + [element.name]) > max_recursion
       logger.warn("XsdPopulator#build_element aborting because of potential endless recursion\n - Current element: #{element.name}\n - stack: #{stack.inspect}")
       return
     end

@@ -208,6 +208,15 @@ describe "XsdPopulator for partial layouts" do
       expect(doc.at("/NewReleaseMessage/MessageHeader/SentOnBehalfOf").attributes['LanguageAndScriptCode'].value).to eq 'UK'
     end
   end
+
+  describe 'flexible recursion protection' do
+    it 'allows a couple of repetitions by default' do
+      xml = populator.populate_element(['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory', 'TechnicalSoundRecordingDetails', 'File'])
+      doc = Nokogiri.XML(xml)
+      expect(doc.at('/File/HashSum/HashSum')).to_not eq nil
+      expect(doc.at('/File/HashSum/HashSum').text).to eq 'xs:string'
+    end
+  end
 end
 
 describe XsdPopulator::Informer do
