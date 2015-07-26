@@ -1,22 +1,22 @@
 PATH
   remote: .
   specs:
-    xsd-populator (0.0.1)
-      builder
-      data-provider (>= 0.0.1)
-      xsd-reader (>= 0.0.1)
+    xsd-populator (0.1.0)
+      builder (~> 3.2)
+      data-provider (~> 0.1)
+      xsd-reader (~> 0.1)
 
 PATH
   remote: /srv/data-provider
   specs:
-    data-provider (0.0.1)
+    data-provider (0.1.0)
 
 PATH
   remote: /srv/xsd-reader
   specs:
     xsd-reader (0.1.0)
-      nokogiri
-      rest-client
+      nokogiri (~> 1.6)
+      rest-client (~> 1.8)
 
 GEM
   remote: https://rubygems.org/
@@ -60,10 +60,10 @@ PLATFORMS
   ruby
 
 DEPENDENCIES
-  byebug
+  byebug (~> 5.0)
   data-provider!
-  nokogiri
-  rspec
+  nokogiri (~> 1.6)
+  rspec (~> 3.3)
   xsd-populator!
   xsd-reader!
 
