@@ -217,6 +217,34 @@ describe "XsdPopulator for partial layouts" do
       expect(doc.at('/File/HashSum/HashSum').text).to eq 'xs:string'
     end
   end
+
+  describe 'provider data for attributes' do
+    class FileProvider
+      include DataProvider::Base
+
+      # returns two datap provider, each with custom data for the TitleType attribute provider
+      provider ['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory', 'Title'] do
+        [
+          add_data(:title_type => 'typeA'),
+          add_data(:title_type => 'typeB')
+        ]
+      end
+
+      # the data provided by the above provider should be avialable in the provider below
+      provider ['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory', 'Title', '@TitleType'] do
+        get_data(:title_type)
+      end
+    end
+
+    it "uses provided data for an element's attribute providers" do
+    populator
+      populator.configure(:provider => FileProvider.new)
+      xml = populator.populate_element(['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory'])
+      doc = Nokogiri.XML(xml)
+      expect(doc.search('/SoundRecordingDetailsByTerritory/Title').length).to eq 2
+      expect(doc.search('/SoundRecordingDetailsByTerritory/Title').map{|node| node.attributes['TitleType'].value}).to eq ['typeA', 'typeB']
+    end
+  end
 end
 
 describe XsdPopulator::Informer do

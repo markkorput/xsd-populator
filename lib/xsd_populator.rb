@@ -117,7 +117,7 @@ class XsdPopulator
     # get node content data from provider
     content_data = provider.nil? ? nil : provider.try_take(stack + [element.name])
     # get attributes content from the provider
-    attributes_data_hash = attributes_data_hash_for(element, provider, stack)
+    attributes_data_hash = nil
 
     if explain_xml? && element.multiple_allowed?
       xml.comment!("Multiple instances of #{element.name} allowed here")
@@ -134,10 +134,16 @@ class XsdPopulator
     # NOTE: this doesn't array-values for single elements, which we don't support (would be turned into a string anway)
 
     content_data.each_with_index do |node_content, idx|
-      # let's see if the provided data is good for building this node, accoridng to the current strategy
+      # let's see if the provided data is good for building this node, according to the current strategy
       next if !build?(element, provider, stack, :content => node_content)
 
-      attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
+      # value for current element is a content provider?
+      if node_content.respond_to?(:try_take)
+        attributes_hash = attributes_for(element, node_content.respond_to?(:take) ? node_content : provider, stack)
+      else
+        attributes_data_hash ||= attributes_data_hash_for(element, provider, stack)
+        attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
+      end
 
       # simple node; name, value, attributes
       if !element.child_elements?
@@ -202,6 +208,17 @@ class XsdPopulator
     end
   end
 
+  def attributes_for(element, provider, stack)
+    element.attributes.inject({}) do |result, attribute|
+      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
+      # attribute_data ||= attribute.type if provider.nil? # assume demo xml
+      if add_attribute?(attribute, provider, stack, :content => attribute_data)
+        result.merge(attribute.name => attribute_data)
+      else
+        result
+      end
+    end
+  end
 
   #
   # Root element
