@@ -1,9 +1,6 @@
-GEM_NAME="xsd-populator"
-PKG_VERSION='0.1.0'
-
 Gem::Specification.new do |s|
-  s.name = GEM_NAME
-  s.version = PKG_VERSION
+  s.name = "xsd-populator"
+  s.version = '0.1.0'
   s.files = `git ls-files`.split($/)
   s.executables = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
 
