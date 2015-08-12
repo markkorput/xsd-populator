@@ -276,4 +276,38 @@ describe XsdPopulator::Informer do
   it "informs the populator to skip an element" do
     expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/MessageHeader')).to eq nil
   end
+
+  it "informs the populator to explicitly add a set of attributes to an element" do
+    provider_class = Class.new(Object) do
+      include DataProvider::Base
+
+      provider ['NewReleaseMessage', '@MessageSchemaVersionId']{ '2010/ern-main/32' }
+
+      provider ['NewReleaseMessage']{
+        XsdPopulator::Informer.new(:attributes => {
+          'xmlns:ern' => 'http://ddex.net/xml/2010/ern-main/32', 
+          'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
+          'xsi:schemaLocation' => 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
+        })
+      }
+
+      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+    end
+
+    populator = XsdPopulator.new({
+      :reader=> xsd_reader,
+      :logger => logger,
+      :provider => provider_class.new
+    })
+
+    el = Nokogiri.XML(populator.populated_xml).at('NewReleaseMessage')
+    expect(el.attributes['schemaLocation'].value).to eq 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
+    expect(el.attributes['MessageSchemaVersionId'].value).to eq '2010/ern-main/32'
+    expect(el.attributes.keys.length).to eq 2
+
+    expect(el.namespace_definitions.map{|nsdef| [nsdef.prefix, nsdef.href]}.sort).to eq([
+      ['ern', 'http://ddex.net/xml/2010/ern-main/32'],
+      ['xsi', 'http://www.w3.org/2001/XMLSchema-instance']
+    ])
+  end
 end

@@ -18,6 +18,10 @@ class XsdPopulator
     def skip?
       options[:skip] == true
     end
+
+    def attributes
+      options[:attributes]
+    end
   end # class Informer
 
   attr_reader :options
@@ -31,7 +35,7 @@ class XsdPopulator
     # remove some cached values
     @logger = nil if _opts[:logger]
     @xsd_reader = nil if _opts[:xsd_reader] || _opts[:reader]
-    uncache if _opts[:strategy]
+    uncache if (_opts.keys & [:strategy,:element,:xsd_file,:xsd,:xsd_reader,:reader,:provider,:data_provider]).length > 0
   end
 
   def uncache
@@ -143,6 +147,7 @@ class XsdPopulator
       else
         attributes_data_hash ||= attributes_data_hash_for(element, provider, stack)
         attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
+        attributes_hash = node_content.attributes.merge(attributes_hash) if node_content.is_a?(Informer) && node_content.attributes.length > 0
       end
 
       # simple node; name, value, attributes
