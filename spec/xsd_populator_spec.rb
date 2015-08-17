@@ -310,4 +310,21 @@ describe XsdPopulator::Informer do
       ['xsi', 'http://www.w3.org/2001/XMLSchema-instance']
     ])
   end
+
+  it "informs the populator to prefix a node with a namespace" do
+    provider_class = Class.new(Object) do
+      include DataProvider::Base
+
+      provider ['NewReleaseMessage']{ XsdPopulator::Informer.new(:namespace => 'ern') }
+      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+    end
+
+    populator = XsdPopulator.new({
+      :reader=> xsd_reader,
+      :logger => logger,
+      :provider => provider_class.new
+    })
+
+    expect(Nokogiri.XML(populator.populated_xml).root.name).to eq 'ern:NewReleaseMessage'
+  end
 end

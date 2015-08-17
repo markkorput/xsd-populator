@@ -20,9 +20,14 @@ class XsdPopulator
     end
 
     def attributes
-      options[:attributes]
+      options[:attributes] || {}
+    end
+
+    def namespace
+      options[:namespace]
     end
   end # class Informer
+
 
   attr_reader :options
 
@@ -166,7 +171,13 @@ class XsdPopulator
       end
 
       # create complex node
-      xml.tag!(element.name, attributes_hash) do
+      node_name = element.name
+
+      if node_content.is_a?(Informer) && node_content.namespace.to_s.length > 0
+        node_name = "#{node_content.namespace}:#{node_name}"
+      end
+
+      xml.tag!(node_name, attributes_hash) do
         # loop over all child node definitions
         element.elements.each do |child|
           # this method call itself recursively for every child node definition of the current element
