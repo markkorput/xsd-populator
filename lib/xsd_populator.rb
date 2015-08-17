@@ -162,12 +162,13 @@ class XsdPopulator
       end
 
       # complex node
+      child_provider = provider
+
       if node_content.respond_to?(:try_take)
         child_provider = node_content
       elsif !node_content.is_a?(Informer)
         logger.warn "Got non-nil, non-provider and non-infomer value for element with child elements (value: #{node_content}, element: #{element.name}, stack: #{stack.inspect})" if node_content
         # strategy dictates to continue; just use the current element's provider for its children
-        child_provider = provider
       end
 
       # create complex node
