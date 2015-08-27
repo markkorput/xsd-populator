@@ -208,4 +208,123 @@ describe "XsdPopulator for partial layouts" do
       expect(doc.at("/NewReleaseMessage/MessageHeader/SentOnBehalfOf").attributes['LanguageAndScriptCode'].value).to eq 'UK'
     end
   end
+
+  describe 'flexible recursion protection' do
+    it 'allows a couple of repetitions by default' do
+      xml = populator.populate_element(['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory', 'TechnicalSoundRecordingDetails', 'File'])
+      doc = Nokogiri.XML(xml)
+      expect(doc.at('/File/HashSum/HashSum')).to_not eq nil
+      expect(doc.at('/File/HashSum/HashSum').text).to eq 'xs:string'
+    end
+  end
+
+  describe 'provider data for attributes' do
+    class FileProvider
+      include DataProvider::Base
+
+      # returns two datap provider, each with custom data for the TitleType attribute provider
+      provider ['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory', 'Title'] do
+        [
+          add_data(:title_type => 'typeA'),
+          add_data(:title_type => 'typeB')
+        ]
+      end
+
+      # the data provided by the above provider should be avialable in the provider below
+      provider ['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory', 'Title', '@TitleType'] do
+        get_data(:title_type)
+      end
+    end
+
+    it "uses provided data for an element's attribute providers" do
+    populator
+      populator.configure(:provider => FileProvider.new)
+      xml = populator.populate_element(['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingDetailsByTerritory'])
+      doc = Nokogiri.XML(xml)
+      expect(doc.search('/SoundRecordingDetailsByTerritory/Title').length).to eq 2
+      expect(doc.search('/SoundRecordingDetailsByTerritory/Title').map{|node| node.attributes['TitleType'].value}).to eq ['typeA', 'typeB']
+    end
+  end
+end
+
+describe XsdPopulator::Informer do
+  class InformProvider
+    include DataProvider::Base
+
+    provides(['NewReleaseMessage', 'MessageHeader'] => XsdPopulator::Informer.new(:skip => true))
+    provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+  end
+
+  let(:xsd_reader){
+    XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
+  }
+
+  let(:logger){
+    logger = Logger.new(STDOUT)
+    logger.level = Logger::WARN
+    logger    
+  }
+
+  let(:populator){
+    XsdPopulator.new({
+      :reader=> xsd_reader,
+      :logger => logger,
+      :provider => InformProvider.new
+    })
+  }
+
+  it "informs the populator to skip an element" do
+    expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/MessageHeader')).to eq nil
+  end
+
+  it "informs the populator to explicitly add a set of attributes to an element" do
+    provider_class = Class.new(Object) do
+      include DataProvider::Base
+
+      provider ['NewReleaseMessage', '@MessageSchemaVersionId']{ '2010/ern-main/32' }
+
+      provider ['NewReleaseMessage']{
+        XsdPopulator::Informer.new(:attributes => {
+          'xmlns:ern' => 'http://ddex.net/xml/2010/ern-main/32', 
+          'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
+          'xsi:schemaLocation' => 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
+        })
+      }
+
+      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+    end
+
+    populator = XsdPopulator.new({
+      :reader=> xsd_reader,
+      :logger => logger,
+      :provider => provider_class.new
+    })
+
+    el = Nokogiri.XML(populator.populated_xml).at('NewReleaseMessage')
+    expect(el.attributes['schemaLocation'].value).to eq 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
+    expect(el.attributes['MessageSchemaVersionId'].value).to eq '2010/ern-main/32'
+    expect(el.attributes.keys.length).to eq 2
+
+    expect(el.namespace_definitions.map{|nsdef| [nsdef.prefix, nsdef.href]}.sort).to eq([
+      ['ern', 'http://ddex.net/xml/2010/ern-main/32'],
+      ['xsi', 'http://www.w3.org/2001/XMLSchema-instance']
+    ])
+  end
+
+  it "informs the populator to prefix a node with a namespace" do
+    provider_class = Class.new(Object) do
+      include DataProvider::Base
+
+      provider ['NewReleaseMessage']{ XsdPopulator::Informer.new(:namespace => 'ern') }
+      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+    end
+
+    populator = XsdPopulator.new({
+      :reader=> xsd_reader,
+      :logger => logger,
+      :provider => provider_class.new
+    })
+
+    expect(Nokogiri.XML(populator.populated_xml).root.name).to eq 'ern:NewReleaseMessage'
+  end
 end

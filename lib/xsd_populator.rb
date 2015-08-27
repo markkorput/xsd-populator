@@ -8,6 +8,27 @@ class XsdPopulator
   class ElementNotFoundException < Exception
   end
 
+  class Informer
+    attr_reader :options
+
+    def initialize(_opts = {})
+      @options = _opts || {}
+    end
+
+    def skip?
+      options[:skip] == true
+    end
+
+    def attributes
+      options[:attributes] || {}
+    end
+
+    def namespace
+      options[:namespace]
+    end
+  end # class Informer
+
+
   attr_reader :options
 
   def initialize(_opts = {})
@@ -19,7 +40,7 @@ class XsdPopulator
     # remove some cached values
     @logger = nil if _opts[:logger]
     @xsd_reader = nil if _opts[:xsd_reader] || _opts[:reader]
-    uncache if _opts[:strategy]
+    uncache if (_opts.keys & [:strategy,:element,:xsd_file,:xsd,:xsd_reader,:reader,:provider,:data_provider]).length > 0
   end
 
   def uncache
@@ -64,6 +85,10 @@ class XsdPopulator
     File.write(path, populated_xml)
   end
 
+  def max_recursion
+    options[:max_recursion] || 3
+  end
+
   private
 
   def populate_xml(element_specifier = nil)
@@ -82,11 +107,15 @@ class XsdPopulator
     return xml.target!
   end
 
+  def stack_recursion_count(stack = [])
+    stack.select{|el| el == stack.last}.length - 1
+  end
+
   def build_element(xml, element, provider = self.provider, stack = [])
     # TODO; more sophisticated recursion detection;
     # multiple elements of the same name should be able
     # to occur insid the stack
-    if stack.include?(element.name)
+    if stack_recursion_count(stack + [element.name]) > max_recursion
       logger.warn("XsdPopulator#build_element aborting because of potential endless recursion\n - Current element: #{element.name}\n - stack: #{stack.inspect}")
       return
     end
@@ -97,7 +126,7 @@ class XsdPopulator
     # get node content data from provider
     content_data = provider.nil? ? nil : provider.try_take(stack + [element.name])
     # get attributes content from the provider
-    attributes_data_hash = attributes_data_hash_for(element, provider, stack)
+    attributes_data_hash = nil
 
     if explain_xml? && element.multiple_allowed?
       xml.comment!("Multiple instances of #{element.name} allowed here")
@@ -114,10 +143,17 @@ class XsdPopulator
     # NOTE: this doesn't array-values for single elements, which we don't support (would be turned into a string anway)
 
     content_data.each_with_index do |node_content, idx|
-      # let's see if the provided data is good for building this node, accoridng to the current strategy
+      # let's see if the provided data is good for building this node, according to the current strategy
       next if !build?(element, provider, stack, :content => node_content)
 
-      attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
+      # value for current element is a content provider?
+      if node_content.respond_to?(:try_take)
+        attributes_hash = attributes_for(element, node_content.respond_to?(:take) ? node_content : provider, stack)
+      else
+        attributes_data_hash ||= attributes_data_hash_for(element, provider, stack)
+        attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
+        attributes_hash = node_content.attributes.merge(attributes_hash) if node_content.is_a?(Informer) && node_content.attributes.length > 0
+      end
 
       # simple node; name, value, attributes
       if !element.child_elements?
@@ -126,16 +162,23 @@ class XsdPopulator
       end
 
       # complex node
+      child_provider = provider
+
       if node_content.respond_to?(:try_take)
         child_provider = node_content
-      else
-        logger.warn "Got non-nil and non-provider value for element with child elements (value: #{node_content}, element: #{element.name}, stack: #{stack.inspect})" if node_content
+      elsif !node_content.is_a?(Informer)
+        logger.warn "Got non-nil, non-provider and non-infomer value for element with child elements (value: #{node_content}, element: #{element.name}, stack: #{stack.inspect})" if node_content
         # strategy dictates to continue; just use the current element's provider for its children
-        child_provider = provider
       end
 
       # create complex node
-      xml.tag!(element.name, attributes_hash) do
+      node_name = element.name
+
+      if node_content.is_a?(Informer) && node_content.namespace.to_s.length > 0
+        node_name = "#{node_content.namespace}:#{node_name}"
+      end
+
+      xml.tag!(node_name, attributes_hash) do
         # loop over all child node definitions
         element.elements.each do |child|
           # this method call itself recursively for every child node definition of the current element
@@ -182,6 +225,17 @@ class XsdPopulator
     end
   end
 
+  def attributes_for(element, provider, stack)
+    element.attributes.inject({}) do |result, attribute|
+      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
+      # attribute_data ||= attribute.type if provider.nil? # assume demo xml
+      if add_attribute?(attribute, provider, stack, :content => attribute_data)
+        result.merge(attribute.name => attribute_data)
+      else
+        result
+      end
+    end
+  end
 
   #
   # Root element
@@ -241,6 +295,9 @@ class XsdPopulator
 
   def build?(element, provider, stack, opts = {})
     content = opts[:content] || provider.try_take([stack, element.name].flatten.compact)
+
+    # we got an Informer object that tells us explicitly to skip this node? Yes sir.
+    return false if content.is_a?(Informer) && content.skip?
 
     # For comlex nodes we need either;
     # - a data provider or
