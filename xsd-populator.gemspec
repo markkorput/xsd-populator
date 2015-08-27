@@ -10,7 +10,6 @@ Gem::Specification.new do |s|
   s.add_development_dependency 'rake', '~> 10.1'
   s.add_development_dependency 'nokogiri', '~> 1.6'
   s.add_development_dependency 'rspec', '~> 3.3'
-  s.add_development_dependency 'byebug', '~> 5.0'
 
   s.author = "Mark van de Korput"
   s.email = "dr.theman@gmail.com"
