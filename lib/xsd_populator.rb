@@ -77,7 +77,11 @@ class XsdPopulator
   end
 
   def populate_element(element_specifier = nil)
-    element_specifier.nil? ? populated_xml : populate_xml(element_specifier)
+    element_specifier.nil? ? populated_xml : populate_xml(:element_specifier => element_specifier)
+  end
+
+  def populate(opts = {})
+    populate_xml(opts.merge(:element_specifier => opts.delete(:element)))
   end
 
   def write_file(path)
@@ -91,16 +95,22 @@ class XsdPopulator
 
   private
 
-  def populate_xml(element_specifier = nil)
-    if (root_el = root_xsd_element(element_specifier)).nil?
+  def populate_xml(opts = {})
+    # supported opts:
+    # :element_specifier
+    # :builder
+
+    if (root_el = root_xsd_element(opts[:element_specifier])).nil?
       logger.warn "Couldn't find element definition, aborting"
       return nil
     end
 
-    xml = Builder::XmlMarkup.new(:indent => 2)
-    xml.instruct!
+    if (xml = opts[:builder]).nil?
+      xml = Builder::XmlMarkup.new(:indent => 2)
+      xml.instruct!
+    end
 
-    stack = options[:relative_provider] == true ? [] : [element_specifier || options[:element]].flatten.compact
+    stack = options[:relative_provider] == true ? [] : [opts[:element_specifier] || options[:element]].flatten.compact
     stack.pop
     build_element(xml, root_el, self.provider, stack)
 
