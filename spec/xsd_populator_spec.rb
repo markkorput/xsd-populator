@@ -102,7 +102,7 @@ describe "XsdPopulator for partial layouts" do
     expect(doc.root.element_children.map(&:name)).to eq ['PartyId', 'PartyName', 'TradingName']
   end
 
-  describe ':relative_provider options' do
+  describe ':relative_provider option' do
     class RelativeProviderTester
       include DataProvider::Base
 
@@ -243,6 +243,29 @@ describe "XsdPopulator for partial layouts" do
       doc = Nokogiri.XML(xml)
       expect(doc.search('/SoundRecordingDetailsByTerritory/Title').length).to eq 2
       expect(doc.search('/SoundRecordingDetailsByTerritory/Title').map{|node| node.attributes['TitleType'].value}).to eq ['typeA', 'typeB']
+    end
+  end
+
+  describe ':builder option' do
+    let(:builder){
+      b = Builder::XmlMarkup.new(:indent => 2)
+      b.instruct!
+      b
+    }
+
+    it 'lets you populate XML into an existing builder instance' do
+      # create two levels of arbitrary xml nodes
+      builder.genericRootNode do |xml|
+        xml.genericSubNode do |xml|
+          # insert the DDEX MessageSender (with nested content) inside our generic XML
+          populator.populate(:builder => xml, :element => ['NewReleaseMessage', 'MessageHeader', 'MessageSender'])
+        end
+      end
+
+      # verify our generic XML layout contains the MessageSender part of the DDEX xml
+      xml_string = builder.target!
+      doc = Nokogiri.XML(xml_string)
+      expect(doc.search('//genericRootNode/genericSubNode/MessageSender/PartyName/FullName').length).to eq 1
     end
   end
 end
