@@ -7,7 +7,10 @@ describe XsdPopulator::Informer do
     provides({
     	['NewReleaseMessage', 'MessageHeader'] => XsdPopulator::Informer.new(:skip => true),
     	['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123,
-    	['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingType'] => XsdPopulator::Informer.content('SuperMegaBox')
+    	['NewReleaseMessage', 'ResourceList', '@LanguageAndScriptCode'] => XsdPopulator::Informer.skip,
+    	['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingType'] => XsdPopulator::Informer.content('SuperMegaBox'),
+    	['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'ReferenceTitle', 'TitleText'] => XsdPopulator::Informer.new(:content => 'SuperSmashHitsDeluxe', :attibutes => {'LanguageAndScriptCode' => XsdPopulator::Informer.skip})
+
   	})
   end
 
@@ -29,7 +32,7 @@ describe XsdPopulator::Informer do
     })
   }
 
-  describe "#skip" do
+  describe "#skip?" do
   	it "specifies if the skip flag is enabled" do
   		expect(XsdPopulator::Informer.new(:skip => true).skip?).to eq true
   		expect(XsdPopulator::Informer.new(:skip => false).skip?).to eq false
@@ -81,6 +84,14 @@ describe XsdPopulator::Informer do
   describe ":skip" do
 	  it "informs the populator to skip an element" do
 	    expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/MessageHeader')).to eq nil
+	  end
+
+	  it "informs the populator to skip an attribute" do
+	  	expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/ResourceList').attributes['Namespace']).to eq nil
+	  end
+
+	  it "informs the populator to skip an attribute" do
+	  	expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/ResourceList/SoundRecording/ReferenceTitle/TitleText').attributes['LanguageAndScriptCode']).to eq nil
 	  end
 	end
 
@@ -143,5 +154,9 @@ describe XsdPopulator::Informer do
 		it "informs the populator to use the specified content for the element" do
 			expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/ResourceList/SoundRecording/SoundRecordingType').text).to eq 'SuperMegaBox'
 		end
+
+	  it "informs the populator to skip an attribute" do
+	  	expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/ResourceList/SoundRecording/ReferenceTitle/TitleText').text).to eq 'SuperSmashHitsDeluxe'
+	  end
 	end
 end

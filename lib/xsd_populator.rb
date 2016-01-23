@@ -156,7 +156,22 @@ class XsdPopulator
       else
         attributes_data_hash ||= attributes_data_hash_for(element, provider, stack)
         attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
-        attributes_hash = node_content.attributes.merge(attributes_hash) if node_content.is_a?(Informer) && node_content.attributes.length > 0
+        
+        if node_content.is_a?(Informer) && node_content.attributes?
+          informer_attributes = node_content.attributes.keys.inject({}) do |result, key|
+            if (informer = node_content.attributes[key]).is_a?(Informer)
+              if informer.skip?
+                result
+              else
+                result.merge(key => informer.content)
+              end
+            else
+              result.merge(key => informer)
+            end
+          end
+
+          attributes_hash.merge!(informer_attributes)
+        end
       end
 
       # simple node; name, value, attributes
@@ -328,6 +343,7 @@ class XsdPopulator
   def add_attribute?(attribute, provider, stack = [], opts = {})
     return true if attribute.required?
     content = opts[:content] || provider.try_take(stack + ["@#{attribute.name}"])
+    return false if content.is_a?(Informer) and content.skip?
     return (!content.nil?) || add_empty_attributes?
   end
 end # class XsdPopulator
