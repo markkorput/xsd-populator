@@ -1,6 +1,7 @@
 Gem::Specification.new do |s|
   s.name = "xsd-populator"
   s.version = '0.2.1'
+  s.date = '2016-01-23'
   s.files = `git ls-files`.split($/)
   s.executables = `git ls-files -- bin/*`.split("\n").map{ |f| File.basename(f) }
 
@@ -13,7 +14,7 @@ Gem::Specification.new do |s|
 
   s.author = "Mark van de Korput"
   s.email = "dr.theman@gmail.com"
-  s.date = '2015-08-27'
+  
   s.summary = %q{A Ruby gem to build XML data from XSD schemas}
   s.description = s.summary
   s.homepage = %q{https://github.com/markkorput/xsd-populator}
