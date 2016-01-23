@@ -4,8 +4,11 @@ describe XsdPopulator::Informer do
   class InformProvider
     include DataProvider::Base
 
-    provides(['NewReleaseMessage', 'MessageHeader'] => XsdPopulator::Informer.new(:skip => true))
-    provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+    provides({
+    	['NewReleaseMessage', 'MessageHeader'] => XsdPopulator::Informer.new(:skip => true),
+    	['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123,
+    	['NewReleaseMessage', 'ResourceList', 'SoundRecording', 'SoundRecordingType'] => XsdPopulator::Informer.content('SuperMegaBox')
+  	})
   end
 
   let(:xsd_reader){
@@ -73,61 +76,72 @@ describe XsdPopulator::Informer do
   		expect(XsdPopulator::Informer.new(:attributes => {}).namespace?).to eq false
   		expect(XsdPopulator::Informer.new.namespace?).to eq false
   	end
-
   end
 
-  it "informs the populator to skip an element" do
-    expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/MessageHeader')).to eq nil
-  end
+  describe ":skip" do
+	  it "informs the populator to skip an element" do
+	    expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/MessageHeader')).to eq nil
+	  end
+	end
 
-  it "informs the populator to explicitly add a set of attributes to an element" do
-    provider_class = Class.new(Object) do
-      include DataProvider::Base
+	describe ":attributes" do
+	  it "informs the populator to explicitly add a set of attributes to an element" do
+	    provider_class = Class.new(Object) do
+	      include DataProvider::Base
 
-      provider ['NewReleaseMessage', '@MessageSchemaVersionId']{ '2010/ern-main/32' }
+	      provider ['NewReleaseMessage', '@MessageSchemaVersionId']{ '2010/ern-main/32' }
 
-      provider ['NewReleaseMessage']{
-        XsdPopulator::Informer.new(:attributes => {
-          'xmlns:ern' => 'http://ddex.net/xml/2010/ern-main/32', 
-          'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
-          'xsi:schemaLocation' => 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
-        })
-      }
+	      provider ['NewReleaseMessage']{
+	        XsdPopulator::Informer.new(:attributes => {
+	          'xmlns:ern' => 'http://ddex.net/xml/2010/ern-main/32', 
+	          'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
+	          'xsi:schemaLocation' => 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
+	        })
+	      }
 
-      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
-    end
+	      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+	    end
 
-    populator = XsdPopulator.new({
-      :reader=> xsd_reader,
-      :logger => logger,
-      :provider => provider_class.new
-    })
+	    populator = XsdPopulator.new({
+	      :reader=> xsd_reader,
+	      :logger => logger,
+	      :provider => provider_class.new
+	    })
 
-    el = Nokogiri.XML(populator.populated_xml).at('NewReleaseMessage')
-    expect(el.attributes['schemaLocation'].value).to eq 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
-    expect(el.attributes['MessageSchemaVersionId'].value).to eq '2010/ern-main/32'
-    expect(el.attributes.keys.length).to eq 2
+	    el = Nokogiri.XML(populator.populated_xml).at('NewReleaseMessage')
+	    expect(el.attributes['schemaLocation'].value).to eq 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
+	    expect(el.attributes['MessageSchemaVersionId'].value).to eq '2010/ern-main/32'
+	    expect(el.attributes.keys.length).to eq 2
 
-    expect(el.namespace_definitions.map{|nsdef| [nsdef.prefix, nsdef.href]}.sort).to eq([
-      ['ern', 'http://ddex.net/xml/2010/ern-main/32'],
-      ['xsi', 'http://www.w3.org/2001/XMLSchema-instance']
-    ])
-  end
+	    expect(el.namespace_definitions.map{|nsdef| [nsdef.prefix, nsdef.href]}.sort).to eq([
+	      ['ern', 'http://ddex.net/xml/2010/ern-main/32'],
+	      ['xsi', 'http://www.w3.org/2001/XMLSchema-instance']
+	    ])
+	  end
+	end
 
-  it "informs the populator to prefix a node with a namespace" do
-    provider_class = Class.new(Object) do
-      include DataProvider::Base
+	describe ":namespace" do
+	  it "informs the populator to prefix a node with a namespace" do
+	    provider_class = Class.new(Object) do
+	      include DataProvider::Base
 
-      provider ['NewReleaseMessage']{ XsdPopulator::Informer.new(:namespace => 'ern') }
-      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
-    end
+	      provider ['NewReleaseMessage']{ XsdPopulator::Informer.new(:namespace => 'ern') }
+	      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+	    end
 
-    populator = XsdPopulator.new({
-      :reader=> xsd_reader,
-      :logger => logger,
-      :provider => provider_class.new
-    })
+	    populator = XsdPopulator.new({
+	      :reader=> xsd_reader,
+	      :logger => logger,
+	      :provider => provider_class.new
+	    })
 
-    expect(Nokogiri.XML(populator.populated_xml).root.name).to eq 'ern:NewReleaseMessage'
-  end
+	    expect(Nokogiri.XML(populator.populated_xml).root.name).to eq 'ern:NewReleaseMessage'
+	  end
+	end
+
+	describe ":content" do
+		it "informs the populator to use the specified content for the element" do
+			expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/ResourceList/SoundRecording/SoundRecordingType').text).to eq 'SuperMegaBox'
+		end
+	end
 end

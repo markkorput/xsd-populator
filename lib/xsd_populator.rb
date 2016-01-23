@@ -161,7 +161,8 @@ class XsdPopulator
 
       # simple node; name, value, attributes
       if !element.child_elements?
-        xml.tag!(element.name, node_content, attributes_hash)
+        cont = node_content.is_a?(Informer) && node_content.content? ? node_content.content : node_content
+        xml.tag!(element.name, cont, attributes_hash)
         next
       end
 
