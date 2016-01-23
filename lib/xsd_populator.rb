@@ -2,32 +2,12 @@ require 'bundler/setup'
 require 'builder'
 require 'xsd_reader'
 require 'xsd_explanation_provider'
+require 'informer'
 
 class XsdPopulator
 
   class ElementNotFoundException < Exception
   end
-
-  class Informer
-    attr_reader :options
-
-    def initialize(_opts = {})
-      @options = _opts || {}
-    end
-
-    def skip?
-      options[:skip] == true
-    end
-
-    def attributes
-      options[:attributes] || {}
-    end
-
-    def namespace
-      options[:namespace]
-    end
-  end # class Informer
-
 
   attr_reader :options
 
@@ -105,16 +85,30 @@ class XsdPopulator
       return nil
     end
 
+    stack = options[:relative_provider] == true ? [] : [opts[:element_specifier] || options[:element]].flatten.compact
+    stack.pop
+
     if (xml = opts[:builder]).nil?
       xml = Builder::XmlMarkup.new(:indent => 2)
       xml.instruct!
     end
 
-    stack = options[:relative_provider] == true ? [] : [opts[:element_specifier] || options[:element]].flatten.compact
-    stack.pop
-    build_element(xml, root_el, self.provider, stack)
+    build_element(xml, root_el, start_provider(root_el, stack), stack)
 
     return xml.target!
+  end
+
+  def start_provider(el, stack)
+    p = self.provider
+
+    1.upto(stack.length) do |cnt|
+      new_p = p.try_take(stack[0, cnt])
+      if new_p.respond_to?(:try_take)
+        p = new_p
+      end
+    end
+
+    return p
   end
 
   def stack_recursion_count(stack = [])

@@ -268,86 +268,36 @@ describe "XsdPopulator for partial layouts" do
       expect(doc.search('//genericRootNode/genericSubNode/MessageSender/PartyName/FullName').length).to eq 1
     end
   end
-end
 
-describe XsdPopulator::Informer do
-  class InformProvider
-    include DataProvider::Base
-
-    provides(['NewReleaseMessage', 'MessageHeader'] => XsdPopulator::Informer.new(:skip => true))
-    provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
-  end
-
-  let(:xsd_reader){
-    XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
-  }
-
-  let(:logger){
-    logger = Logger.new(STDOUT)
-    logger.level = Logger::WARN
-    logger    
-  }
-
-  let(:populator){
-    XsdPopulator.new({
-      :reader=> xsd_reader,
-      :logger => logger,
-      :provider => InformProvider.new
-    })
-  }
-
-  it "informs the populator to skip an element" do
-    expect(Nokogiri.XML(populator.populated_xml).at('/NewReleaseMessage/MessageHeader')).to eq nil
-  end
-
-  it "informs the populator to explicitly add a set of attributes to an element" do
-    provider_class = Class.new(Object) do
+  describe "full stack traversal" do
+    class FullStackProvider
       include DataProvider::Base
 
-      provider ['NewReleaseMessage', '@MessageSchemaVersionId']{ '2010/ern-main/32' }
+      provider ['NewReleaseMessage'] do
+        self.add_data!(:party_id => 'NewReleaseID__')
+      end
 
-      provider ['NewReleaseMessage']{
-        XsdPopulator::Informer.new(:attributes => {
-          'xmlns:ern' => 'http://ddex.net/xml/2010/ern-main/32', 
-          'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
-          'xsi:schemaLocation' => 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
-        })
-      }
-
-      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+      provider ['NewReleaseMessage', 'MessageHeader', 'MessageId'] do
+        self.get_data(:party_id) || 'ID-Missing'
+      end
     end
 
-    populator = XsdPopulator.new({
-      :reader=> xsd_reader,
-      :logger => logger,
-      :provider => provider_class.new
-    })
+    let(:populator){
+      XsdPopulator.new({
+        :element => ['NewReleaseMessage', 'MessageHeader'],
+        :reader=> xsd_reader,
+        :logger => logger,
+        :strategy => :complete,
+        :provider => FullStackProvider.new
+      })
+    }
 
-    el = Nokogiri.XML(populator.populated_xml).at('NewReleaseMessage')
-    expect(el.attributes['schemaLocation'].value).to eq 'http://ddex.net/xml/2010/ern-main/32 http://ddex.net/xml/2010/ern-main/32/ern-main.xsd'
-    expect(el.attributes['MessageSchemaVersionId'].value).to eq '2010/ern-main/32'
-    expect(el.attributes.keys.length).to eq 2
+    let(:doc){
+      Nokogiri.XML(populator.populated_xml)
+    }
 
-    expect(el.namespace_definitions.map{|nsdef| [nsdef.prefix, nsdef.href]}.sort).to eq([
-      ['ern', 'http://ddex.net/xml/2010/ern-main/32'],
-      ['xsi', 'http://www.w3.org/2001/XMLSchema-instance']
-    ])
-  end
-
-  it "informs the populator to prefix a node with a namespace" do
-    provider_class = Class.new(Object) do
-      include DataProvider::Base
-
-      provider ['NewReleaseMessage']{ XsdPopulator::Informer.new(:namespace => 'ern') }
-      provides(['NewReleaseMessage', 'MessageHeader', 'MessageId'] => 123)
+    it "executes the data providers for the omitted parent elements" do
+      expect(doc.at('/MessageHeader/MessageId').inner_text).to eq 'NewReleaseID__'
     end
-
-    populator = XsdPopulator.new({
-      :reader=> xsd_reader,
-      :logger => logger,
-      :provider => provider_class.new
-    })
-
-    expect(Nokogiri.XML(populator.populated_xml).root.name).to eq 'ern:NewReleaseMessage'
   end
 end
