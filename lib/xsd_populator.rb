@@ -2,32 +2,12 @@ require 'bundler/setup'
 require 'builder'
 require 'xsd_reader'
 require 'xsd_explanation_provider'
+require 'informer'
 
 class XsdPopulator
 
   class ElementNotFoundException < Exception
   end
-
-  class Informer
-    attr_reader :options
-
-    def initialize(_opts = {})
-      @options = _opts || {}
-    end
-
-    def skip?
-      options[:skip] == true
-    end
-
-    def attributes
-      options[:attributes] || {}
-    end
-
-    def namespace
-      options[:namespace]
-    end
-  end # class Informer
-
 
   attr_reader :options
 
@@ -105,16 +85,30 @@ class XsdPopulator
       return nil
     end
 
+    stack = options[:relative_provider] == true ? [] : [opts[:element_specifier] || options[:element]].flatten.compact
+    stack.pop
+
     if (xml = opts[:builder]).nil?
       xml = Builder::XmlMarkup.new(:indent => 2)
       xml.instruct!
     end
 
-    stack = options[:relative_provider] == true ? [] : [opts[:element_specifier] || options[:element]].flatten.compact
-    stack.pop
-    build_element(xml, root_el, self.provider, stack)
+    build_element(xml, root_el, start_provider(root_el, stack), stack)
 
     return xml.target!
+  end
+
+  def start_provider(el, stack)
+    p = self.provider
+
+    1.upto(stack.length) do |cnt|
+      new_p = p.try_take(stack[0, cnt])
+      if new_p.respond_to?(:try_take)
+        p = new_p
+      end
+    end
+
+    return p
   end
 
   def stack_recursion_count(stack = [])
@@ -162,12 +156,28 @@ class XsdPopulator
       else
         attributes_data_hash ||= attributes_data_hash_for(element, provider, stack)
         attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
-        attributes_hash = node_content.attributes.merge(attributes_hash) if node_content.is_a?(Informer) && node_content.attributes.length > 0
+        
+        if node_content.is_a?(Informer) && node_content.attributes?
+          informer_attributes = node_content.attributes.keys.inject({}) do |result, key|
+            if (informer = node_content.attributes[key]).is_a?(Informer)
+              if informer.skip?
+                result
+              else
+                result.merge(key => informer.content)
+              end
+            else
+              result.merge(key => informer)
+            end
+          end
+
+          attributes_hash.merge!(informer_attributes)
+        end
       end
 
       # simple node; name, value, attributes
       if !element.child_elements?
-        xml.tag!(element.name, node_content, attributes_hash)
+        cont = node_content.is_a?(Informer) && node_content.content? ? node_content.content : node_content
+        xml.tag!(element.name, cont, attributes_hash)
         next
       end
 
@@ -333,6 +343,7 @@ class XsdPopulator
   def add_attribute?(attribute, provider, stack = [], opts = {})
     return true if attribute.required?
     content = opts[:content] || provider.try_take(stack + ["@#{attribute.name}"])
+    return false if content.is_a?(Informer) and content.skip?
     return (!content.nil?) || add_empty_attributes?
   end
 end # class XsdPopulator

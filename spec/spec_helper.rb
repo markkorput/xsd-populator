@@ -13,6 +13,12 @@ rescue LoadError => e
   Logger.new(STDOUT).warn("Could not load byebug, continuing without it")
 end
 
+def spec_logger
+	@spec_logger_cache ||= Logger.new(STDOUT).tap do |logr|
+		logr.level = Logger::WARN
+	end
+end
+
 CURRENT_DIR=File.dirname(__FILE__)
 $: << File.expand_path(CURRENT_DIR + "/../lib")
 
