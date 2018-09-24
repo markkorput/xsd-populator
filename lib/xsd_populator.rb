@@ -134,7 +134,7 @@ class XsdPopulator
 
     if explain_xml? && element.multiple_allowed?
       xml.comment!("Multiple instances of #{element.name} allowed here")
-    end 
+    end
 
     # just log a warning if we got an array value for an element that is not allowed
     # to occurs multiple times according to the XSD schema (but still allow data provider to generate the xml)
@@ -145,7 +145,6 @@ class XsdPopulator
     # make sure it's an array
     content_data = [content_data].flatten # if element.multiple_allowed? && content_data.is_a?(Array)
     # NOTE: this doesn't array-values for single elements, which we don't support (would be turned into a string anway)
-
     content_data.each_with_index do |node_content, idx|
       # let's see if the provided data is good for building this node, according to the current strategy
       next if !build?(element, provider, stack, :content => node_content)
@@ -156,7 +155,7 @@ class XsdPopulator
       else
         attributes_data_hash ||= attributes_data_hash_for(element, provider, stack)
         attributes_hash = attributes_hash_for_index(attributes_data_hash, idx)
-        
+
         if node_content.is_a?(Informer) && node_content.attributes?
           informer_attributes = node_content.attributes.keys.inject({}) do |result, key|
             if (informer = node_content.attributes[key]).is_a?(Informer)
@@ -174,10 +173,16 @@ class XsdPopulator
         end
       end
 
+      node_name = element.name
+
+      if node_content.is_a?(Informer) && node_content.namespace.to_s.length > 0
+        node_name = "#{node_content.namespace}:#{node_name}"
+      end
+
       # simple node; name, value, attributes
       if !element.child_elements?
         cont = node_content.is_a?(Informer) && node_content.content? ? node_content.content : node_content
-        xml.tag!(element.name, cont, attributes_hash)
+        xml.tag!(node_name, cont, attributes_hash)
         next
       end
 
@@ -192,12 +197,6 @@ class XsdPopulator
       end
 
       # create complex node
-      node_name = element.name
-
-      if node_content.is_a?(Informer) && node_content.namespace.to_s.length > 0
-        node_name = "#{node_content.namespace}:#{node_name}"
-      end
-
       xml.tag!(node_name, attributes_hash) do
         # loop over all child node definitions
         element.elements.each do |child|
@@ -215,7 +214,7 @@ class XsdPopulator
 
   def attributes_data_hash_for(element, provider, stack)
     element.attributes.inject({}) do |result, attribute|
-      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
+      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])
       # attribute_data ||= attribute.type if provider.nil? # assume demo xml
       if add_attribute?(attribute, provider, stack, :content => attribute_data)
         result.merge(attribute.name => attribute_data)
@@ -235,7 +234,7 @@ class XsdPopulator
   def attributes_hash_for_index(attribute_data_hash, idx)
     # each of the attribute values can be an array as well. If not,
     # we'll just use it's singular value for all instances of this node
-    # if there 
+    # if there
     current_attrs = attribute_data_hash.to_a.inject({}) do |result, key_value|
       key = key_value[0]
       value = key_value[1]
@@ -247,7 +246,7 @@ class XsdPopulator
 
   def attributes_for(element, provider, stack)
     element.attributes.inject({}) do |result, attribute|
-      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])  
+      attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])
       # attribute_data ||= attribute.type if provider.nil? # assume demo xml
       if add_attribute?(attribute, provider, stack, :content => attribute_data)
         result.merge(attribute.name => attribute_data)
@@ -323,7 +322,7 @@ class XsdPopulator
     # - a data provider or
     # - explicit confirmation to build without providers or
     # - providers available for offspring elements
-    if element.child_elements? 
+    if element.child_elements?
       return content.respond_to?(:try_take) || build_node_without_provider? || provider.has_providers_with_scope?(stack + [element.name])
     end
 
@@ -332,7 +331,7 @@ class XsdPopulator
 
     return false
 
-    # !build_node_without_provider? || 
+    # !build_node_without_provider? ||
     # return true if provider
   end
 
