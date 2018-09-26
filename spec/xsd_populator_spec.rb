@@ -8,7 +8,7 @@ describe XsdPopulator do
   let(:logger){
     logger = Logger.new(STDOUT)
     logger.level = Logger::WARN
-    logger    
+    logger
   }
 
   let(:populator){
@@ -30,7 +30,7 @@ describe XsdPopulator do
       expect(populator.options[:relative_provider]).to eq :absolutely
       # restore configuration
       populator.configure old_options
-      # verify 
+      # verify
       expect(populator.xsd_reader).to eq xsd_reader
       expect(populator.logger).to eq logger
       expect(populator.options[:relative_provider]).to eq nil
@@ -75,7 +75,7 @@ describe "XsdPopulator for partial layouts" do
   let(:logger){
     logger = Logger.new(STDOUT)
     logger.level = Logger::WARN
-    logger    
+    logger
   }
 
   let(:populator){
@@ -154,7 +154,7 @@ describe "XsdPopulator for partial layouts" do
 
     let(:populator){
       XsdPopulator.new({
-        # :element => ['NewReleaseMessage', 'MessageHeader'], # We're going for 'FULL' render this time 
+        # :element => ['NewReleaseMessage', 'MessageHeader'], # We're going for 'FULL' render this time
         :reader => xsd_reader,
         :provider => StrategyProvider.new,
         :logger => logger
@@ -182,7 +182,7 @@ describe "XsdPopulator for partial layouts" do
     it "adds empty simple nodes when :strategy is :all_simple_elements" do
       populator.configure(:strategy => :nil_to_empty)
       doc = Nokogiri.XML(xml = populator.populated_xml)
-      expect(doc.search("/NewReleaseMessage/DealList").length).to eq 1 # jsut like 
+      expect(doc.search("/NewReleaseMessage/DealList").length).to eq 1 # just like
       expect(doc.search("/NewReleaseMessage/DealList/ReleaseDeal").length).to eq 0
       expect(doc.search("/NewReleaseMessage/ReleaseList").length).to eq 0
       expect(doc.search("/NewReleaseMessage/ResourceList").length).to eq 1
@@ -299,5 +299,54 @@ describe "XsdPopulator for partial layouts" do
     it "executes the data providers for the omitted parent elements" do
       expect(doc.at('/MessageHeader/MessageId').inner_text).to eq 'NewReleaseID__'
     end
+  end
+end
+
+describe "XsdPopulator with namespaced simple nodes" do
+  # let(:logger){
+  #   logger = Logger.new(STDOUT)
+  #   logger.level = Logger::WARN
+  #   logger
+  # }
+
+  it "lets you specify namespace prefixes for simple nodes" do
+
+    # Custom provider that applies a namespace to some elements
+    class NamespaceProvider
+      include DataProvider::Base
+
+      # specify namespaces for two elements
+      provides({
+        ['NewReleaseMessage', 'MessageHeader', 'MessageSender', 'PartyName'] => XsdPopulator::Informer.new(:namespace => "__PREFIX1__"),
+        ['NewReleaseMessage', 'MessageHeader', 'MessageSender', 'PartyName', 'FullName'] => XsdPopulator::Informer.new(:namespace => "__PREFIX2__")
+      })
+    end
+
+    # initialize our populator (and XSD reader)
+    xsd_reader = XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
+
+    populator = XsdPopulator.new({
+      :element => ['NewReleaseMessage', 'MessageHeader', 'MessageSender', 'PartyName'],
+      :reader=> xsd_reader,
+      :provider => NamespaceProvider.new,
+      # :logger => logger,
+      :strategy => :complete
+    })
+
+    xml = %(<?xml version="1.0" encoding="UTF-8"?>
+<__PREFIX1__:PartyName LanguageAndScriptCode="">
+  <__PREFIX2__:FullName LanguageAndScriptCode=""/>
+  <FullNameAsciiTranscribed/>
+  <FullNameIndexed LanguageAndScriptCode=""/>
+  <NamesBeforeKeyName LanguageAndScriptCode=""/>
+  <KeyName LanguageAndScriptCode=""/>
+  <NamesAfterKeyName LanguageAndScriptCode=""/>
+  <AbbreviatedName LanguageAndScriptCode=""/>
+</__PREFIX1__:PartyName>)
+
+    expect(populator.populated_xml.strip).to eq xml.strip
+
+    doc = Nokogiri.XML(populator.populated_xml)
+    expect(doc.root.name).to eq '__PREFIX1__:PartyName'
   end
 end
