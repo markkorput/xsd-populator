@@ -181,7 +181,7 @@ class XsdPopulator
 
       # simple node; name, value, attributes
       if !element.child_elements?
-        cont = node_content.is_a?(Informer) && node_content.content? ? node_content.content : node_content
+        cont = node_content.is_a?(Informer) ? node_content.content : node_content
         xml.tag!(node_name, cont, attributes_hash)
         next
       end
@@ -346,4 +346,3 @@ class XsdPopulator
     return (!content.nil?) || add_empty_attributes?
   end
 end # class XsdPopulator
-
