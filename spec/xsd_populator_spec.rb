@@ -345,8 +345,81 @@ describe "XsdPopulator with namespaced simple nodes" do
 </__PREFIX1__:PartyName>)
 
     expect(populator.populated_xml.strip).to eq xml.strip
+  end
+end
 
-    doc = Nokogiri.XML(populator.populated_xml)
-    expect(doc.root.name).to eq '__PREFIX1__:PartyName'
+
+describe "XsdPopulator accepts attributes for complexType" do
+
+  it "lets you specify attributes for complex nodes" do
+
+    # Custom provider that applies a namespace to some elements
+    class AttributesProvider
+      include DataProvider::Base
+
+      # specify namespaces for two elements
+      provides({
+        ['NewReleaseMessage', 'MessageHeader', 'MessageSender', 'PartyName', "@LanguageAndScriptCode"] => 'FR'
+      })
+    end
+
+    # initialize our populator (and XSD reader)
+    xsd_reader = XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
+
+    populator = XsdPopulator.new({
+      :element => ['NewReleaseMessage', 'MessageHeader', 'MessageSender', 'PartyName'],
+      :reader=> xsd_reader,
+      :provider => AttributesProvider.new,
+      :strategy => :complete
+    })
+
+    xml = %(<?xml version="1.0" encoding="UTF-8"?>
+<PartyName LanguageAndScriptCode="FR">
+  <FullName LanguageAndScriptCode=""/>
+  <FullNameAsciiTranscribed/>
+  <FullNameIndexed LanguageAndScriptCode=""/>
+  <NamesBeforeKeyName LanguageAndScriptCode=""/>
+  <KeyName LanguageAndScriptCode=""/>
+  <NamesAfterKeyName LanguageAndScriptCode=""/>
+  <AbbreviatedName LanguageAndScriptCode=""/>
+</PartyName>)
+
+    expect(populator.populated_xml.strip).to eq xml.strip
+  end
+
+  it "lets you specify attributes for complex nodes using an Informer" do
+
+    # Custom provider that applies a namespace to some elements
+    class AttributesProvider
+      include DataProvider::Base
+
+      # specify namespaces for two elements
+      provides({
+        ['NewReleaseMessage', 'MessageHeader', 'MessageSender', 'PartyName'] => XsdPopulator::Informer.new(attributes: {LanguageAndScriptCode: 'DE'})
+      })
+    end
+
+    # initialize our populator (and XSD reader)
+    xsd_reader = XsdReader::XML.new(:xsd_file => File.expand_path(File.join(File.dirname(__FILE__), 'examples', 'ddex-ern-v36.xsd')))
+
+    populator = XsdPopulator.new({
+      :element => ['NewReleaseMessage', 'MessageHeader', 'MessageSender', 'PartyName'],
+      :reader=> xsd_reader,
+      :provider => AttributesProvider.new,
+      :strategy => :complete
+    })
+
+    xml = %(<?xml version="1.0" encoding="UTF-8"?>
+<PartyName LanguageAndScriptCode="DE">
+  <FullName LanguageAndScriptCode=""/>
+  <FullNameAsciiTranscribed/>
+  <FullNameIndexed LanguageAndScriptCode=""/>
+  <NamesBeforeKeyName LanguageAndScriptCode=""/>
+  <KeyName LanguageAndScriptCode=""/>
+  <NamesAfterKeyName LanguageAndScriptCode=""/>
+  <AbbreviatedName LanguageAndScriptCode=""/>
+</PartyName>)
+
+    expect(populator.populated_xml.strip).to eq xml.strip
   end
 end

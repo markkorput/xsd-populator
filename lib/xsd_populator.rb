@@ -162,10 +162,10 @@ class XsdPopulator
               if informer.skip?
                 result
               else
-                result.merge(key => informer.content)
+                result.merge(key.to_s => informer.content)
               end
             else
-              result.merge(key => informer)
+              result.merge(key.to_s => informer)
             end
           end
 
@@ -217,7 +217,7 @@ class XsdPopulator
       attribute_data = provider.nil? ? nil : provider.try_take(stack + [element.name, "@#{attribute.name}"])
       # attribute_data ||= attribute.type if provider.nil? # assume demo xml
       if add_attribute?(attribute, provider, stack, :content => attribute_data)
-        result.merge(attribute.name => attribute_data)
+        result.merge(attribute.name.to_s => attribute_data)
       else
         result
       end
@@ -240,7 +240,7 @@ class XsdPopulator
       value = key_value[1]
       logger.warn "XsdPopulator#attributes_hash_for_index - got an array with insufficient values for attribute `#{key}`. Attribute data hash: #{attribute_data_hash}, index: #{idx}" if value.is_a?(Array) && value.length <= idx
       attr_value = attribute_value_for_index(value, idx)
-      result.merge(key => attr_value)
+      result.merge(key.to_s => attr_value)
     end
   end
 
