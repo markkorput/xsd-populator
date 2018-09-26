@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    xsd-populator (0.2.0)
+    xsd-populator (0.2.1)
       builder (~> 3.2)
       data-provider (~> 0.2)
       xsd-reader (~> 0.2)
@@ -9,17 +9,17 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    builder (3.2.2)
+    builder (3.2.3)
     byebug (5.0.0)
       columnize (= 0.9.0)
     columnize (0.9.0)
-    data-provider (0.2.0)
+    data-provider (0.2.3)
     diff-lcs (1.2.5)
-    domain_name (0.5.25)
+    domain_name (0.5.20180417)
       unf (>= 0.0.5, < 1.0.0)
-    http-cookie (1.0.2)
+    http-cookie (1.0.3)
       domain_name (~> 0.5)
-    mime-types (2.6.2)
+    mime-types (2.99.3)
     mini_portile (0.6.2)
     netrc (0.11.0)
     nokogiri (1.6.6.2)
@@ -44,8 +44,8 @@ GEM
     rspec-support (3.3.0)
     unf (0.1.4)
       unf_ext
-    unf_ext (0.0.7.1)
-    xsd-reader (0.2.0)
+    unf_ext (0.0.7.5)
+    xsd-reader (0.4.0)
       nokogiri (~> 1.6)
       rest-client (~> 1.8)
 
@@ -60,4 +60,4 @@ DEPENDENCIES
   xsd-populator!
 
 BUNDLED WITH
-   1.10.5
+   1.16.2
